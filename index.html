@@ -13,172 +13,229 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 input,select,textarea,button{font-family:inherit;font-size:13px;outline:none}
 input,select,textarea{background:#fff;border:1px solid #ddd;border-radius:6px;padding:6px 10px;color:#1a1a1a;width:100%}
 input:focus,select:focus,textarea:focus{border-color:#1D9E75}
+button{background:none}
 ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:#ddd;border-radius:3px}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const {useState,useMemo,useEffect,useCallback}=React;
+const {useState, useEffect, useCallback, useMemo} = React;
 
-const SCRIPT_URL="https://script.google.com/macros/s/AKfycbyR2_dqgSMmAbfHfFqWYyb_RZGRjFoq_lp4GFtl3pZqP1WTZf8IcU5MJAxXzks2B7fe/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyR2_dqgSMmAbfHfFqWYyb_RZGRjFoq_lp4GFtl3pZqP1WTZf8IcU5MJAxXzks2B7fe/exec";
+const PINS = {secretaria:"1234", admin:"9999"};
+const C = {primary:"#1D9E75",pLight:"#E1F5EE",danger:"#E24B4A",dLight:"#FCEBEB",warn:"#BA7517",wLight:"#FAEEDA",info:"#378ADD",iLight:"#E6F1FB"};
+const HORAS = Array.from({length:28},(_,i)=>{ const h=Math.floor(i*20/60+8),m=(i*20)%60; return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0"); });
 
-function sheetsGet(sheet){
-  return new Promise((resolve,reject)=>{
+function sheetsGet(sheet) {
+  return new Promise((res,rej)=>{
     const cb="cb_"+Math.random().toString(36).slice(2);
     const s=document.createElement("script");
-    const t=setTimeout(()=>{delete window[cb];document.body.removeChild(s);reject(new Error("Timeout"));},15000);
-    window[cb]=(d)=>{clearTimeout(t);delete window[cb];document.body.removeChild(s);d&&d.error?reject(new Error(d.error)):resolve(Array.isArray(d)?d:[]);};
-    s.src=`${SCRIPT_URL}?sheet=${encodeURIComponent(sheet)}&callback=${cb}`;
-    s.onerror=()=>{clearTimeout(t);reject(new Error("Error de red"));};
+    const t=setTimeout(()=>{delete window[cb];s.remove();rej(new Error("Timeout"));},15000);
+    window[cb]=(d)=>{clearTimeout(t);delete window[cb];s.remove();d&&d.error?rej(new Error(d.error)):res(Array.isArray(d)?d:[]);};
+    s.src=SCRIPT_URL+"?sheet="+encodeURIComponent(sheet)+"&callback="+cb;
+    s.onerror=()=>{clearTimeout(t);rej(new Error("Error de red"));};
     document.body.appendChild(s);
   });
 }
-function sheetsWrite(sheet,rows){
-  return new Promise((resolve,reject)=>{
+function sheetsWrite(sheet, rows) {
+  return new Promise((res,rej)=>{
     const cb="cb_"+Math.random().toString(36).slice(2);
     const s=document.createElement("script");
-    const t=setTimeout(()=>{delete window[cb];document.body.removeChild(s);reject(new Error("Timeout"));},20000);
-    window[cb]=(d)=>{clearTimeout(t);delete window[cb];document.body.removeChild(s);d&&d.error?reject(new Error(d.error)):resolve(d);};
-    const payload=encodeURIComponent(JSON.stringify({sheet,rows}));
-    s.src=`${SCRIPT_URL}?action=write&callback=${cb}&payload=${payload}`;
-    s.onerror=()=>{clearTimeout(t);reject(new Error("Error de red"));};
+    const t=setTimeout(()=>{delete window[cb];s.remove();rej(new Error("Timeout"));},20000);
+    window[cb]=(d)=>{clearTimeout(t);delete window[cb];s.remove();d&&d.error?rej(new Error(d.error)):res(d);};
+    s.src=SCRIPT_URL+"?action=write&callback="+cb+"&payload="+encodeURIComponent(JSON.stringify({sheet,rows}));
+    s.onerror=()=>{clearTimeout(t);rej(new Error("Error de red"));};
     document.body.appendChild(s);
   });
 }
 
-const PINS={secretaria:"1234",admin:"9999"};
-const fmt=n=>new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}).format(n);
-const fmtDate=d=>{try{return new Date(d).toLocaleDateString("es-AR")}catch{return d}};
-const todayStr=()=>new Date().toISOString().slice(0,10);
-const nowStr=()=>new Date().toISOString().slice(0,16);
-const C={primary:"#1D9E75",primaryLight:"#E1F5EE",danger:"#E24B4A",dangerLight:"#FCEBEB",warn:"#BA7517",warnLight:"#FAEEDA",info:"#378ADD",infoLight:"#E6F1FB"};
-const eColor=e=>e==="Asistió"?C.primary:e==="Ausente"?C.danger:C.warn;
-const eBg=e=>e==="Asistió"?C.primaryLight:e==="Ausente"?C.dangerLight:C.warnLight;
+const fmt = n => new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}).format(n);
+const fmtD = d => { try{return new Date(d).toLocaleDateString("es-AR")}catch{return d} };
+const today = () => new Date().toISOString().slice(0,10);
+const now = () => new Date().toISOString().slice(0,16);
+const eCol = e => e==="Asistió"?C.primary:e==="Ausente"?C.danger:C.warn;
+const eBg  = e => e==="Asistió"?C.pLight:e==="Ausente"?C.dLight:C.wLight;
 
-// SVG Icons
-const Ic={
-  Calendar:()=><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
-  Users:()=><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
-  Dollar:()=><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
-  Settings:()=><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06-.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
-  Plus:()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
-  Search:()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
-  X:()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
-  Check:()=><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>,
-  Clock:()=><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
-  Alert:()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
-  Trash:()=><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>,
-  EyeOff:()=><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>,
-  Refresh:()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>,
-  Save:()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
-  Edit:()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
-};
+// ── UI helpers ────────────────────────────────────────────────────────────────
+function Badge({color,bg,children}){ return <span style={{background:bg,color,fontSize:11,fontWeight:500,padding:"2px 8px",borderRadius:99,whiteSpace:"nowrap",display:"inline-block"}}>{children}</span>; }
+function Card({children,style}){ return <div style={{background:"#fff",border:"1px solid #ececec",borderRadius:12,padding:"1rem 1.25rem",...style}}>{children}</div>; }
+function Btn({onClick,children,variant,small,style,disabled}){
+  const v = variant||"default";
+  const base = {cursor:disabled?"not-allowed":"pointer",border:"1px solid #ddd",borderRadius:8,padding:small?"4px 10px":"7px 14px",fontSize:small?12:13,fontWeight:500,display:"inline-flex",alignItems:"center",gap:5,opacity:disabled?.5:1,...style};
+  const vs = {default:{background:"#fff",color:"#1a1a1a"},primary:{background:C.primary,color:"#fff",border:"none"},danger:{background:C.dLight,color:C.danger,border:"1px solid "+C.danger},ghost:{background:"transparent",border:"none",color:"#666"}};
+  return <button onClick={disabled?undefined:onClick} style={{...base,...vs[v]}}>{children}</button>;
+}
+function Inp({label,...p}){ return <div style={{marginBottom:10}}>{label&&<label style={{fontSize:12,color:"#666",display:"block",marginBottom:3}}>{label}</label>}<input {...p}/></div>; }
+function Sel({label,children,...p}){ return <div style={{marginBottom:10}}>{label&&<label style={{fontSize:12,color:"#666",display:"block",marginBottom:3}}>{label}</label>}<select {...p}>{children}</select></div>; }
+function Spin({size,color}){ return <svg width={size||16} height={size||16} viewBox="0 0 24 24" fill="none" style={{animation:"spin 1s linear infinite",flexShrink:0}}><circle cx="12" cy="12" r="10" stroke={color||"currentColor"} strokeWidth="3" strokeDasharray="31" strokeDashoffset="10" strokeLinecap="round"/></svg>; }
 
-const Logo=({size=48})=>{ const r=size*0.22,cx=size/2,cy=size/2,off=r*0.72; return(<svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="none">{[[cx,cy-off],[cx+off,cy],[cx,cy+off],[cx-off,cy]].map(([x,y],i)=><circle key={i} cx={x} cy={y} r={r} stroke="#4a4a4a" strokeWidth={size*0.025} fill="none"/>)}</svg>);};
-const LogoFull=({compact})=>(<div style={{display:"flex",flexDirection:compact?"row":"column",alignItems:"center",gap:compact?8:4}}><Logo size={compact?32:72}/><div style={{textAlign:compact?"left":"center"}}><div style={{display:"flex",alignItems:"center",gap:6,justifyContent:compact?"flex-start":"center"}}><span style={{fontFamily:"Georgia,serif",fontSize:compact?16:28,fontWeight:400,letterSpacing:.5}}>Nutrición</span><span style={{background:"#3BBFB2",color:"#fff",fontSize:compact?9:11,fontWeight:700,padding:compact?"1px 5px":"2px 7px",borderRadius:5,letterSpacing:1,textTransform:"uppercase"}}>Salta</span></div>{!compact&&<p style={{margin:0,fontSize:12,color:"#888",fontStyle:"italic"}}>Volvé a entender tu cuerpo</p>}</div></div>);
-
-const Badge=({color,bg,children})=><span style={{background:bg,color,fontSize:11,fontWeight:500,padding:"2px 8px",borderRadius:99,display:"inline-block",whiteSpace:"nowrap"}}>{children}</span>;
-const Card=({children,style={}})=><div style={{background:"#fff",border:"1px solid #ececec",borderRadius:12,padding:"1rem 1.25rem",...style}}>{children}</div>;
-const Btn=({onClick,children,variant="default",small,style={},disabled})=>{
-  const base={cursor:disabled?"not-allowed":"pointer",border:"1px solid #e0e0e0",borderRadius:8,padding:small?"4px 10px":"7px 14px",fontSize:small?12:13,fontWeight:500,display:"inline-flex",alignItems:"center",gap:5,opacity:disabled?.5:1,...style};
-  const v={default:{background:"#fff",color:"#1a1a1a"},primary:{background:C.primary,color:"#fff",border:"none"},danger:{background:C.dangerLight,color:C.danger,border:`1px solid ${C.danger}`},ghost:{background:"transparent",border:"none",color:"#666"}};
-  return <button onClick={disabled?undefined:onClick} style={{...base,...v[variant]}}>{children}</button>;
-};
-const Inp=({label,...p})=>(<div style={{marginBottom:10}}>{label&&<label style={{fontSize:12,color:"#666",display:"block",marginBottom:3}}>{label}</label>}<input {...p}/></div>);
-const Sel=({label,children,...p})=>(<div style={{marginBottom:10}}>{label&&<label style={{fontSize:12,color:"#666",display:"block",marginBottom:3}}>{label}</label>}<select {...p}>{children}</select></div>);
-const Spin=({size=16,color="currentColor"})=>(<svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{animation:"spin 1s linear infinite",flexShrink:0}}><style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style><circle cx="12" cy="12" r="10" stroke={color} strokeWidth="3" strokeDasharray="31" strokeDashoffset="10" strokeLinecap="round"/></svg>);
-
-const HORAS=Array.from({length:28},(_,i)=>{const h=Math.floor(i*20/60+8),m=(i*20)%60;return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0");});
+// ── Logo ──────────────────────────────────────────────────────────────────────
+function Logo({size}){
+  const s=size||48,r=s*.22,cx=s/2,cy=s/2,o=r*.72;
+  return <svg width={s} height={s} viewBox={"0 0 "+s+" "+s} fill="none">
+    {[[cx,cy-o],[cx+o,cy],[cx,cy+o],[cx-o,cy]].map(([x,y],i)=><circle key={i} cx={x} cy={y} r={r} stroke="#4a4a4a" strokeWidth={s*.025} fill="none"/>)}
+  </svg>;
+}
+function LogoFull({compact}){
+  return <div style={{display:"flex",flexDirection:compact?"row":"column",alignItems:"center",gap:compact?8:4}}>
+    <Logo size={compact?32:72}/>
+    <div style={{textAlign:compact?"left":"center"}}>
+      <div style={{display:"flex",alignItems:"center",gap:6,justifyContent:compact?"flex-start":"center"}}>
+        <span style={{fontFamily:"Georgia,serif",fontSize:compact?16:28,fontWeight:400,letterSpacing:.5}}>Nutrición</span>
+        <span style={{background:"#3BBFB2",color:"#fff",fontSize:compact?9:11,fontWeight:700,padding:compact?"1px 5px":"2px 7px",borderRadius:5,letterSpacing:1,textTransform:"uppercase"}}>Salta</span>
+      </div>
+      {!compact && <p style={{margin:0,fontSize:12,color:"#888",fontStyle:"italic"}}>Volvé a entender tu cuerpo</p>}
+    </div>
+  </div>;
+}
 
 // ── PIN ───────────────────────────────────────────────────────────────────────
-function PinModal({pendingRole,onSuccess,onCancel}){
+function PinModal({role,onSuccess,onCancel}){
   const [pin,setPin]=useState("");
   const [err,setErr]=useState(false);
   useEffect(()=>{
-    const fn=e=>{if(e.key>="0"&&e.key<="9")hk(e.key);else if(e.key==="Backspace")hk("⌫");else if(e.key==="Escape")onCancel();};
-    window.addEventListener("keydown",fn);return()=>window.removeEventListener("keydown",fn);
+    function fn(e){
+      if(e.key>="0"&&e.key<="9") hk(e.key);
+      else if(e.key==="Backspace") hk("⌫");
+      else if(e.key==="Escape") onCancel();
+    }
+    window.addEventListener("keydown",fn);
+    return ()=>window.removeEventListener("keydown",fn);
   });
-  const hk=k=>{
-    if(k==="")return;if(k==="⌫"){setPin(p=>p.slice(0,-1));setErr(false);return;}
+  function hk(k){
+    if(k==="")return;
+    if(k==="⌫"){setPin(p=>p.slice(0,-1));setErr(false);return;}
     if(pin.length>=4)return;
-    const np=pin+String(k);setPin(np);setErr(false);
-    if(np.length===4){if(np===PINS[pendingRole])onSuccess();else{setErr(true);setTimeout(()=>{setPin("");setErr(false);},700);}}
-  };
-  return(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50}}>
-      <div style={{background:"#fff",borderRadius:14,padding:"1.5rem",width:300,border:"1px solid #ececec",textAlign:"center"}}>
-        <p style={{margin:"0 0 4px",fontWeight:500,fontSize:15}}>Ingresá tu PIN</p>
-        <p style={{margin:"0 0 1rem",fontSize:12,color:"#666"}}>Rol: {pendingRole==="admin"?"Administrador":"Secretaría"}</p>
-        <div style={{display:"flex",justifyContent:"center",gap:10,marginBottom:12}}>
-          {[0,1,2,3].map(i=><div key={i} style={{width:32,height:40,borderRadius:8,border:`1.5px solid ${err?C.danger:pin.length>i?C.primary:"#ddd"}`,background:"#f8f8f8",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color:err?C.danger:C.primary}}>{pin.length>i?"●":""}</div>)}
-        </div>
-        {err&&<p style={{margin:"0 0 8px",fontSize:12,color:C.danger}}>PIN incorrecto.</p>}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
-          {[1,2,3,4,5,6,7,8,9,"",0,"⌫"].map((k,i)=><button key={i} onClick={()=>hk(k)} disabled={k===""} style={{padding:"12px 0",borderRadius:8,border:"1px solid #ececec",background:k===""?"transparent":"#f8f8f8",cursor:k===""?"default":"pointer",fontSize:16,fontWeight:500,opacity:k===""?0:1}}>{k}</button>)}
-        </div>
-        <Btn onClick={onCancel} style={{width:"100%",justifyContent:"center"}}>Cancelar</Btn>
+    const np=pin+String(k); setPin(np); setErr(false);
+    if(np.length===4){
+      if(np===PINS[role]) onSuccess();
+      else{setErr(true);setTimeout(()=>{setPin("");setErr(false);},700);}
+    }
+  }
+  return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50}}>
+    <div style={{background:"#fff",borderRadius:14,padding:"1.5rem",width:300,textAlign:"center",border:"1px solid #ececec"}}>
+      <p style={{margin:"0 0 4px",fontWeight:500,fontSize:15}}>Ingresá tu PIN</p>
+      <p style={{margin:"0 0 1rem",fontSize:12,color:"#666"}}>Rol: {role==="admin"?"Administrador":"Secretaría"}</p>
+      <div style={{display:"flex",justifyContent:"center",gap:10,marginBottom:12}}>
+        {[0,1,2,3].map(i=><div key={i} style={{width:32,height:40,borderRadius:8,border:"1.5px solid "+(err?C.danger:pin.length>i?C.primary:"#ddd"),background:"#f8f8f8",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color:err?C.danger:C.primary}}>{pin.length>i?"●":""}</div>)}
       </div>
+      {err&&<p style={{margin:"0 0 8px",fontSize:12,color:C.danger}}>PIN incorrecto.</p>}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
+        {[1,2,3,4,5,6,7,8,9,"",0,"⌫"].map((k,i)=><button key={i} onClick={()=>hk(k)} style={{padding:"12px 0",borderRadius:8,border:"1px solid #ececec",background:k===""?"transparent":"#f8f8f8",cursor:k===""?"default":"pointer",fontSize:16,fontWeight:500,opacity:k===""?0:1}}>{k}</button>)}
+      </div>
+      <Btn onClick={onCancel} style={{width:"100%",justifyContent:"center"}}>Cancelar</Btn>
     </div>
-  );
+  </div>;
 }
 
-function LoginScreen({onLogin}){
+// ── Login ─────────────────────────────────────────────────────────────────────
+function Login({onLogin}){
   const [pending,setPending]=useState(null);
-  return(
-    <div style={{minHeight:"100vh",background:"#f5f5f5",display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{background:"#fff",border:"1px solid #ececec",borderRadius:16,padding:"2rem",width:320,textAlign:"center"}}>
-        <div style={{margin:"0 auto 1.5rem"}}><LogoFull/></div>
-        <p style={{margin:"0 0 1.5rem",fontSize:13,color:"#666"}}>Seleccioná tu rol para ingresar</p>
-        <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {[{id:"secretaria",label:"Secretaría",desc:"Turnos, pacientes y cobros"},{id:"admin",label:"Administrador",desc:"Acceso total + caja y configuración"}].map(r=>(
-            <button key={r.id} onClick={()=>setPending(r.id)} style={{padding:"12px 16px",borderRadius:10,border:"1px solid #e0e0e0",background:"#f8f8f8",cursor:"pointer",textAlign:"left"}}>
-              <p style={{margin:0,fontWeight:500,fontSize:14}}>{r.label}</p>
-              <p style={{margin:0,fontSize:12,color:"#666"}}>{r.desc}</p>
-            </button>
-          ))}
+  return <div style={{minHeight:"100vh",background:"#f5f5f5",display:"flex",alignItems:"center",justifyContent:"center"}}>
+    <div style={{background:"#fff",border:"1px solid #ececec",borderRadius:16,padding:"2rem",width:320,textAlign:"center"}}>
+      <div style={{marginBottom:"1.5rem"}}><LogoFull/></div>
+      <p style={{margin:"0 0 1.5rem",fontSize:13,color:"#666"}}>Seleccioná tu rol para ingresar</p>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {[{id:"secretaria",label:"Secretaría",desc:"Turnos, pacientes y cobros"},{id:"admin",label:"Administrador",desc:"Acceso total + caja y configuración"}].map(r=>(
+          <button key={r.id} onClick={()=>setPending(r.id)} style={{padding:"12px 16px",borderRadius:10,border:"1px solid #e0e0e0",background:"#f8f8f8",cursor:"pointer",textAlign:"left"}}>
+            <p style={{margin:0,fontWeight:500,fontSize:14}}>{r.label}</p>
+            <p style={{margin:0,fontSize:12,color:"#666"}}>{r.desc}</p>
+          </button>
+        ))}
+      </div>
+    </div>
+    {pending && <PinModal role={pending} onSuccess={()=>{onLogin(pending);setPending(null);}} onCancel={()=>setPending(null)}/>}
+  </div>;
+}
+
+// ── Paciente ficha ────────────────────────────────────────────────────────────
+function FichaPaciente({p,plans,txs,isAdmin,onSeguimiento,onVender}){
+  const bal = useMemo(()=>{
+    const paid=txs.filter(t=>t.pacienteId===p.id&&t.estado==="Activo").reduce((a,t)=>a+t.monto,0);
+    const owed=txs.filter(t=>t.pacienteId===p.id&&t.estado==="Activo"&&t.planId).reduce((a,t)=>{const pl=plans.find(x=>x.id===t.planId);return a+(pl?pl.price:0);},0);
+    return Math.max(0,owed-paid);
+  },[txs,plans,p]);
+
+  return <div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
+    {bal>0 && <div style={{background:C.dLight,border:"1px solid "+C.danger,borderRadius:10,padding:"10px 14px",display:"flex",gap:10,alignItems:"center"}}>
+      <span style={{color:C.danger,fontSize:20}}>⚠</span>
+      <div><span style={{fontSize:13,fontWeight:500,color:C.danger}}>Saldo pendiente: {fmt(bal)}</span><p style={{margin:0,fontSize:11,color:C.danger}}>Plan sin pago total.</p></div>
+    </div>}
+    <Card>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+        <div style={{width:44,height:44,borderRadius:"50%",background:C.pLight,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:500,fontSize:14,color:C.primary,flexShrink:0}}>{p.nombre[0]}{p.apellido[0]}</div>
+        <div>
+          <p style={{margin:0,fontWeight:500,fontSize:15}}>{p.nombre} {p.apellido}</p>
+          <p style={{margin:0,fontSize:12,color:"#666"}}>DNI {p.dni} · {fmtD(p.fechaNac)}</p>
+        </div>
+        <div style={{marginLeft:"auto",textAlign:"right"}}>
+          <p style={{margin:0,fontSize:11,color:"#666"}}>Sesiones</p>
+          <p style={{margin:0,fontSize:22,fontWeight:500,color:p.sesiones===0?C.danger:C.primary}}>{p.sesiones}</p>
         </div>
       </div>
-      {pending&&<PinModal pendingRole={pending} onSuccess={()=>{onLogin(pending);setPending(null);}} onCancel={()=>setPending(null)}/>}
-    </div>
-  );
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"4px 12px",fontSize:12,borderTop:"1px solid #ececec",paddingTop:10}}>
+        {[["Tel",p.tel],["Email",p.email],["Dir",p.dir]].map(([k,v])=><div key={k}><span style={{color:"#666"}}>{k}: </span>{v||"—"}</div>)}
+      </div>
+    </Card>
+    <Card>
+      <p style={{margin:"0 0 10px",fontWeight:500,fontSize:14}}>Vender plan</p>
+      {plans.length===0
+        ? <p style={{fontSize:13,color:C.warn}}>{isAdmin?"Configurá planes primero.":"Pedile al admin que configure los planes."}</p>
+        : <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {plans.map(pl=><div key={pl.id} style={{flex:1,minWidth:130,border:"1px solid #ececec",borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
+              <p style={{margin:"0 0 2px",fontSize:13,fontWeight:500}}>{pl.name}</p>
+              <p style={{margin:"0 0 4px",fontSize:11,color:"#666"}}>{pl.sessions} sesiones</p>
+              <p style={{margin:"0 0 8px",fontSize:14,fontWeight:500,color:C.primary}}>{fmt(pl.price)}</p>
+              <Btn small variant="primary" onClick={()=>onVender(p.id,pl.id)} style={{width:"100%",justifyContent:"center"}}>Vender</Btn>
+            </div>)}
+          </div>
+      }
+    </Card>
+    <Card>
+      <p style={{margin:"0 0 8px",fontWeight:500,fontSize:14}}>Seguimiento clínico</p>
+      <textarea defaultValue={p.seguimiento||""} onBlur={e=>onSeguimiento(p.id,e.target.value)} rows={7} placeholder="Evolución, encuestas, notas…" style={{resize:"vertical",fontSize:13}}/>
+      <p style={{margin:"4px 0 0",fontSize:11,color:"#999"}}>Se guarda al salir del campo.</p>
+    </Card>
+  </div>;
 }
 
 // ── App ───────────────────────────────────────────────────────────────────────
 function App(){
-  const [role,setRole]=useState(null);
-  const [tab,setTab]=useState("agenda");
-  const [patients,setPatients]=useState([]);
-  const [turnos,setTurnos]=useState([]);
-  const [txs,setTxs]=useState([]);
-  const [plans,setPlans]=useState([]);
-  const [loading,setLoading]=useState(false);
-  const [loadMsg,setLoadMsg]=useState("");
-  const [saving,setSaving]=useState(false);
-  const [saveErr,setSaveErr]=useState("");
-  const [selPat,setSelPat]=useState(null);
-  const [search,setSearch]=useState("");
-  const [agDate,setAgDate]=useState(todayStr());
-  const [modal,setModal]=useState(null);
-  const [nTurno,setNTurno]=useState({pacienteId:"",fecha:todayStr(),hora:"09:00"});
-  const [editTurno,setEditTurno]=useState(null);
-  const [nPac,setNPac]=useState({nombre:"",apellido:"",dni:"",fechaNac:"",tel:"",dir:"",email:""});
-  const [nTx,setNTx]=useState({pacienteId:"",tipo:"Pago Total",metodo:"Efectivo",monto:"",planId:"",turnoId:""});
-  const [repPer,setRepPer]=useState("diario");
-  const [editPlans,setEditPlans]=useState([]);
-  const [planMsg,setPlanMsg]=useState("");
+  const [role,setRole]         = useState(null);
+  const [tab,setTab]           = useState("agenda");
+  const [patients,setPatients] = useState([]);
+  const [turnos,setTurnos]     = useState([]);
+  const [txs,setTxs]           = useState([]);
+  const [plans,setPlans]       = useState([]);
+  const [loading,setLoading]   = useState(false);
+  const [loadMsg,setLoadMsg]   = useState("");
+  const [saving,setSaving]     = useState(false);
+  const [err,setErr]           = useState("");
+  const [selPat,setSelPat]     = useState(null);
+  const [search,setSearch]     = useState("");
+  const [agDate,setAgDate]     = useState(today());
+  const [modal,setModal]       = useState(null);
+  const [nTurno,setNTurno]     = useState({pacienteId:"",fecha:today(),hora:"09:00"});
+  const [eTurno,setETurno]     = useState(null);
+  const [nPac,setNPac]         = useState({nombre:"",apellido:"",dni:"",fechaNac:"",tel:"",dir:"",email:""});
+  const [nTx,setNTx]           = useState({pacienteId:"",tipo:"Pago Total",metodo:"Efectivo",monto:"",planId:"",turnoId:""});
+  const [repPer,setRepPer]     = useState("diario");
+  const [ePlans,setEPlans]     = useState([]);
+  const [planMsg,setPlanMsg]   = useState("");
 
-  const isAdmin=role==="admin";
-  const getPac=id=>patients.find(p=>p.id===id);
-  const nextId=arr=>arr.length>0?Math.max(...arr.map(x=>Number(x.id)))+1:1;
+  const isAdmin = role==="admin";
+  const byId = (arr,id) => arr.find(x=>x.id===id);
+  const nextId = arr => arr.length>0 ? Math.max(...arr.map(x=>Number(x.id)))+1 : 1;
 
-  const loadAll=useCallback(async()=>{
-    setLoading(true);setSaveErr("");
+  const loadAll = useCallback(async()=>{
+    setLoading(true); setErr("");
     try{
       setLoadMsg("Cargando planes…");
       const pl=await sheetsGet("planes");
-      const plP=pl.map(p=>({...p,id:Number(p.id),sessions:Number(p.sessions),price:Number(p.price)}));
-      setPlans(plP);setEditPlans(plP);
+      const plp=pl.map(p=>({...p,id:Number(p.id),sessions:Number(p.sessions),price:Number(p.price)}));
+      setPlans(plp); setEPlans(plp);
       setLoadMsg("Cargando pacientes…");
       const pa=await sheetsGet("pacientes");
       setPatients(pa.map(p=>({...p,id:Number(p.id),sesiones:Number(p.sesiones||0)})));
@@ -188,394 +245,424 @@ function App(){
       setLoadMsg("Cargando transacciones…");
       const tx=await sheetsGet("transacciones");
       setTxs(tx.map(t=>({...t,id:Number(t.id),pacienteId:Number(t.pacienteId),monto:Number(t.monto),planId:t.planId?Number(t.planId):null,turnoId:t.turnoId?Number(t.turnoId):null})));
-    }catch(e){setSaveErr(e.message||"Error al conectar.");}
-    finally{setLoading(false);setLoadMsg("");}
+    }catch(e){ setErr(e.message||"Error al conectar."); }
+    finally{ setLoading(false); setLoadMsg(""); }
   },[]);
 
-  useEffect(()=>{if(role)loadAll();},[role]);
+  useEffect(()=>{ if(role) loadAll(); },[role]);
 
-  const save=async(sheet,data)=>{setSaving(true);setSaveErr("");try{await sheetsWrite(sheet,data);}catch(e){setSaveErr("Error: "+e.message);}finally{setSaving(false);}};
-
-  const pendingBalance=pid=>{
-    const paid=txs.filter(t=>t.pacienteId===pid&&t.estado==="Activo").reduce((a,t)=>a+t.monto,0);
-    const owed=txs.filter(t=>t.pacienteId===pid&&t.estado==="Activo"&&t.planId).reduce((a,t)=>{const pl=plans.find(p=>p.id===t.planId);return a+(pl?pl.price:0);},0);
-    return Math.max(0,owed-paid);
+  const save = async(sheet,data)=>{
+    setSaving(true); setErr("");
+    try{ await sheetsWrite(sheet,data); }
+    catch(e){ setErr("Error: "+e.message); }
+    finally{ setSaving(false); }
   };
 
-  const turnosDia=useMemo(()=>turnos.filter(t=>t.fecha===agDate).sort((a,b)=>a.hora.localeCompare(b.hora)),[turnos,agDate]);
-  const turnosSemana=useMemo(()=>{
+  // turnos
+  const turnosDia  = useMemo(()=>turnos.filter(t=>t.fecha===agDate).sort((a,b)=>a.hora.localeCompare(b.hora)),[turnos,agDate]);
+  const turnosHoy  = useMemo(()=>turnos.filter(t=>t.fecha===today()),[turnos]);
+  const turnosSem  = useMemo(()=>{
     const d=new Date(agDate),dow=d.getDay(),mon=new Date(d);
     mon.setDate(d.getDate()-(dow===0?6:dow-1));
-    return Array.from({length:7},(_,i)=>{const dd=new Date(mon);dd.setDate(mon.getDate()+i);const date=dd.toISOString().slice(0,10);return{date,ts:turnos.filter(t=>t.fecha===date).sort((a,b)=>a.hora.localeCompare(b.hora))};});
+    return Array.from({length:7},(_,i)=>{
+      const dd=new Date(mon); dd.setDate(mon.getDate()+i);
+      const date=dd.toISOString().slice(0,10);
+      return {date, ts:turnos.filter(t=>t.fecha===date).sort((a,b)=>a.hora.localeCompare(b.hora))};
+    });
   },[turnos,agDate]);
 
-  const markAsistencia=async(tid,estado)=>{
+  // txs
+  const txsHoy = useMemo(()=>txs.filter(t=>t.fecha.slice(0,10)===today()),[txs]);
+  const txsMes = useMemo(()=>txs.filter(t=>t.fecha.slice(0,7)===today().slice(0,7)),[txs]);
+  const calcRep = list=>{
+    const a=list.filter(t=>t.estado==="Activo");
+    return {ef:a.filter(t=>t.metodo==="Efectivo").reduce((s,t)=>s+t.monto,0), tr:a.filter(t=>t.metodo==="Transferencia").reduce((s,t)=>s+t.monto,0), tot:a.reduce((s,t)=>s+t.monto,0)};
+  };
+  const rep = calcRep(repPer==="diario"?txsHoy:txsMes);
+
+  const filteredPats = useMemo(()=>patients.filter(p=>p.dni.includes(search)||p.apellido.toLowerCase().includes(search.toLowerCase())||p.nombre.toLowerCase().includes(search.toLowerCase())),[patients,search]);
+
+  async function markAsist(tid,estado){
     let nP=patients;
-    const nT=turnos.map(t=>{if(t.id!==tid)return t;if(estado==="Asistió")nP=patients.map(p=>p.id===t.pacienteId&&p.sesiones>0?{...p,sesiones:p.sesiones-1}:p);return{...t,estado};});
-    setTurnos(nT);setPatients(nP);await save("turnos",nT);if(estado==="Asistió")await save("pacientes",nP);
-  };
-  const addTurno=async()=>{
-    if(!nTurno.pacienteId||!nTurno.fecha||!nTurno.hora)return;
+    const nT=turnos.map(t=>{
+      if(t.id!==tid) return t;
+      if(estado==="Asistió") nP=patients.map(p=>p.id===t.pacienteId&&p.sesiones>0?{...p,sesiones:p.sesiones-1}:p);
+      return {...t,estado};
+    });
+    setTurnos(nT); setPatients(nP);
+    await save("turnos",nT);
+    if(estado==="Asistió") await save("pacientes",nP);
+  }
+  async function addTurno(){
+    if(!nTurno.pacienteId||!nTurno.fecha||!nTurno.hora) return;
     const nT=[...turnos,{id:nextId(turnos),pacienteId:parseInt(nTurno.pacienteId),fecha:nTurno.fecha,hora:nTurno.hora,estado:"Pendiente"}];
-    setTurnos(nT);setModal(null);await save("turnos",nT);
-  };
-  const saveEditTurno=async()=>{
-    if(!editTurno)return;
-    const nT=turnos.map(t=>t.id===editTurno.id?{...t,fecha:editTurno.fecha,hora:editTurno.hora}:t);
-    setTurnos(nT);setModal(null);setEditTurno(null);await save("turnos",nT);
-  };
-  const addPaciente=async()=>{
-    if(!nPac.nombre||!nPac.apellido||!nPac.dni)return;
+    setTurnos(nT); setModal(null); await save("turnos",nT);
+  }
+  async function saveEditTurno(){
+    if(!eTurno) return;
+    const nT=turnos.map(t=>t.id===eTurno.id?{...t,fecha:eTurno.fecha,hora:eTurno.hora}:t);
+    setTurnos(nT); setModal(null); setETurno(null); await save("turnos",nT);
+  }
+  async function addPaciente(){
+    if(!nPac.nombre||!nPac.apellido||!nPac.dni) return;
     const nP=[...patients,{id:nextId(patients),...nPac,seguimiento:"",sesiones:0}];
-    setPatients(nP);setModal(null);setNPac({nombre:"",apellido:"",dni:"",fechaNac:"",tel:"",dir:"",email:""});
+    setPatients(nP); setModal(null); setNPac({nombre:"",apellido:"",dni:"",fechaNac:"",tel:"",dir:"",email:""});
     await save("pacientes",nP);
-  };
-  const venderPlan=async(pid,planId)=>{
-    const pl=plans.find(p=>p.id===planId);if(!pl)return;
+  }
+  async function venderPlan(pid,planId){
+    const pl=plans.find(p=>p.id===planId); if(!pl) return;
     const nP=patients.map(p=>p.id===pid?{...p,sesiones:p.sesiones+pl.sessions}:p);
-    const nTx=[...txs,{id:nextId(txs),pacienteId:pid,tipo:"Plan vendido",metodo:"—",monto:pl.price,fecha:nowStr(),estado:"Activo",planId,turnoId:null}];
-    setPatients(nP);setTxs(nTx);await save("pacientes",nP);await save("transacciones",nTx);
-  };
-  const addTx=async()=>{
-    if(!nTx.monto||!nTx.pacienteId)return;
-    const nList=[...txs,{id:nextId(txs),pacienteId:parseInt(nTx.pacienteId),tipo:nTx.tipo,metodo:nTx.metodo,monto:parseFloat(nTx.monto),fecha:nowStr(),estado:"Activo",planId:nTx.planId?parseInt(nTx.planId):null,turnoId:nTx.turnoId?parseInt(nTx.turnoId):null}];
-    setTxs(nList);setNTx({pacienteId:"",tipo:"Pago Total",metodo:"Efectivo",monto:"",planId:"",turnoId:""});
+    const nTx=[...txs,{id:nextId(txs),pacienteId:pid,tipo:"Plan vendido",metodo:"—",monto:pl.price,fecha:now(),estado:"Activo",planId,turnoId:null}];
+    setPatients(nP); setTxs(nTx);
+    await save("pacientes",nP); await save("transacciones",nTx);
+  }
+  async function addTx(){
+    if(!nTx.monto||!nTx.pacienteId) return;
+    const nList=[...txs,{id:nextId(txs),pacienteId:parseInt(nTx.pacienteId),tipo:nTx.tipo,metodo:nTx.metodo,monto:parseFloat(nTx.monto),fecha:now(),estado:"Activo",planId:nTx.planId?parseInt(nTx.planId):null,turnoId:nTx.turnoId?parseInt(nTx.turnoId):null}];
+    setTxs(nList); setNTx({pacienteId:"",tipo:"Pago Total",metodo:"Efectivo",monto:"",planId:"",turnoId:""});
     await save("transacciones",nList);
-  };
-  const anularTx=async id=>{const n=txs.map(t=>t.id===id?{...t,estado:"Anulado"}:t);setTxs(n);await save("transacciones",n);};
-  const saveSeg=async(pid,text)=>{const n=patients.map(p=>p.id===pid?{...p,seguimiento:text}:p);setPatients(n);await save("pacientes",n);};
-  const savePlanes=async()=>{setPlans(editPlans);setPlanMsg("Guardando…");await save("planes",editPlans);setPlanMsg("¡Guardado!");setTimeout(()=>setPlanMsg(""),3000);};
-  const addPlan=()=>setEditPlans(p=>[...p,{id:nextId(p),name:"Nuevo Plan",sessions:1,price:0}]);
-  const removePlan=id=>setEditPlans(p=>p.filter(x=>x.id!==id));
-  const updatePlan=(id,f,v)=>setEditPlans(p=>p.map(x=>x.id===id?{...x,[f]:f==="name"?v:Number(v)}:x));
+  }
+  async function anularTx(id){
+    const n=txs.map(t=>t.id===id?{...t,estado:"Anulado"}:t);
+    setTxs(n); await save("transacciones",n);
+  }
+  async function saveSeg(pid,text){
+    const n=patients.map(p=>p.id===pid?{...p,seguimiento:text}:p);
+    setPatients(n); await save("pacientes",n);
+  }
+  async function savePlanes(){
+    setPlans(ePlans); setPlanMsg("Guardando…");
+    await save("planes",ePlans);
+    setPlanMsg("¡Guardado!"); setTimeout(()=>setPlanMsg(""),3000);
+  }
 
-  const filteredPats=patients.filter(p=>p.dni.includes(search)||p.apellido.toLowerCase().includes(search.toLowerCase())||p.nombre.toLowerCase().includes(search.toLowerCase()));
-  const txsHoy=txs.filter(t=>t.fecha.slice(0,10)===todayStr());
-  const txsMes=txs.filter(t=>t.fecha.slice(0,7)===todayStr().slice(0,7));
-  const calcRep=list=>{const a=list.filter(t=>t.estado==="Activo");return{efectivo:a.filter(t=>t.metodo==="Efectivo").reduce((s,t)=>s+t.monto,0),transfer:a.filter(t=>t.metodo==="Transferencia").reduce((s,t)=>s+t.monto,0),total:a.reduce((s,t)=>s+t.monto,0)};};
-  const rep=calcRep(repPer==="diario"?txsHoy:txsMes);
-  const turnosHoy=turnos.filter(t=>t.fecha===todayStr());
-  const tabSt=t=>({padding:"8px 14px",cursor:"pointer",borderRadius:8,fontSize:13,fontWeight:500,display:"flex",alignItems:"center",gap:6,background:tab===t?C.primaryLight:"transparent",color:tab===t?C.primary:"#666",border:"none"});
+  const tabSt = t => ({padding:"8px 14px",cursor:"pointer",borderRadius:8,fontSize:13,fontWeight:500,display:"flex",alignItems:"center",gap:6,background:tab===t?C.pLight:"transparent",color:tab===t?C.primary:"#666",border:"none"});
 
-  if(!role)return <LoginScreen onLogin={r=>{setRole(r);setTab("agenda");}}/>;
-  if(loading)return(<div style={{minHeight:"100vh",background:"#f5f5f5",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}><LogoFull/><div style={{display:"flex",alignItems:"center",gap:10,color:C.primary,marginTop:16}}><Spin size={20} color={C.primary}/><span style={{fontSize:14}}>{loadMsg}</span></div></div>);
+  if(!role) return <Login onLogin={r=>{setRole(r);setTab("agenda");}}/>;
 
-  return(
-    <div style={{minHeight:"100vh",background:"#f5f5f5"}}>
-      {saving&&<div style={{position:"fixed",top:10,right:16,zIndex:100,background:C.primaryLight,color:C.primary,border:`1px solid ${C.primary}`,borderRadius:8,padding:"6px 12px",fontSize:12,display:"flex",alignItems:"center",gap:6}}><Spin size={12} color={C.primary}/> Guardando…</div>}
-      {saveErr&&<div style={{position:"fixed",top:10,right:16,zIndex:100,background:C.dangerLight,color:C.danger,border:`1px solid ${C.danger}`,borderRadius:8,padding:"6px 12px",fontSize:12,maxWidth:320}}>⚠ {saveErr}<button onClick={()=>setSaveErr("")} style={{marginLeft:8,background:"none",border:"none",cursor:"pointer",color:C.danger,fontWeight:700}}>×</button></div>}
+  if(loading) return <div style={{minHeight:"100vh",background:"#f5f5f5",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
+    <LogoFull/>
+    <div style={{display:"flex",alignItems:"center",gap:10,color:C.primary,marginTop:16}}><Spin size={20} color={C.primary}/><span style={{fontSize:14}}>{loadMsg}</span></div>
+  </div>;
 
-      {/* Header */}
-      <div style={{background:"#fff",borderBottom:"1px solid #ececec",padding:"0 1.5rem",display:"flex",alignItems:"center",justifyContent:"space-between",height:52}}>
-        <LogoFull compact/>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <button onClick={loadAll} style={{background:"none",border:"none",cursor:"pointer",color:"#666",display:"flex"}}><Ic.Refresh/></button>
-          <div style={{width:28,height:28,borderRadius:"50%",background:isAdmin?"#E6F1FB":C.primaryLight,display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <span style={{fontSize:11,fontWeight:500,color:isAdmin?C.info:C.primary}}>{isAdmin?"AD":"SC"}</span>
-          </div>
-          <span style={{fontSize:12,color:"#666"}}>{isAdmin?"Administrador":"Secretaría"}</span>
-          <Btn small onClick={()=>{setRole(null);setTab("agenda");}}>Cerrar sesión</Btn>
+  return <div style={{minHeight:"100vh",background:"#f5f5f5"}}>
+    {saving && <div style={{position:"fixed",top:10,right:16,zIndex:100,background:C.pLight,color:C.primary,border:"1px solid "+C.primary,borderRadius:8,padding:"6px 12px",fontSize:12,display:"flex",alignItems:"center",gap:6}}><Spin size={12} color={C.primary}/> Guardando…</div>}
+    {err    && <div style={{position:"fixed",top:10,right:16,zIndex:100,background:C.dLight,color:C.danger,border:"1px solid "+C.danger,borderRadius:8,padding:"6px 12px",fontSize:12,maxWidth:320}}>⚠ {err}<button onClick={()=>setErr("")} style={{marginLeft:8,background:"none",border:"none",cursor:"pointer",color:C.danger,fontWeight:700}}>×</button></div>}
+
+    {/* Header */}
+    <div style={{background:"#fff",borderBottom:"1px solid #ececec",padding:"0 1.5rem",display:"flex",alignItems:"center",justifyContent:"space-between",height:52}}>
+      <LogoFull compact/>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <button onClick={loadAll} style={{border:"none",cursor:"pointer",color:"#666",display:"flex",padding:4}}>↺</button>
+        <div style={{width:28,height:28,borderRadius:"50%",background:isAdmin?"#E6F1FB":C.pLight,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <span style={{fontSize:11,fontWeight:500,color:isAdmin?C.info:C.primary}}>{isAdmin?"AD":"SC"}</span>
         </div>
+        <span style={{fontSize:12,color:"#666"}}>{isAdmin?"Administrador":"Secretaría"}</span>
+        <Btn small onClick={()=>{setRole(null);setTab("agenda");}}>Cerrar sesión</Btn>
+      </div>
+    </div>
+
+    <div style={{display:"flex",height:"calc(100vh - 52px)"}}>
+      {/* Sidebar */}
+      <div style={{width:185,background:"#fff",borderRight:"1px solid #ececec",padding:"1rem .75rem",display:"flex",flexDirection:"column",gap:4,flexShrink:0}}>
+        <button style={tabSt("agenda")}    onClick={()=>setTab("agenda")}>   📅 Agenda</button>
+        <button style={tabSt("pacientes")} onClick={()=>setTab("pacientes")}>👤 Pacientes</button>
+        <button style={tabSt("cobros")}    onClick={()=>setTab("cobros")}>   💵 Cobros</button>
+        {isAdmin && <button style={tabSt("caja")}   onClick={()=>setTab("caja")}>  📊 Caja y finanzas</button>}
+        {isAdmin && <button style={tabSt("config")} onClick={()=>setTab("config")}>⚙️ Configuración</button>}
       </div>
 
-      <div style={{display:"flex",height:"calc(100vh - 52px)"}}>
-        {/* Sidebar */}
-        <div style={{width:185,background:"#fff",borderRight:"1px solid #ececec",padding:"1rem 0.75rem",display:"flex",flexDirection:"column",gap:4,flexShrink:0}}>
-          {[
-            {id:"agenda",icon:<Ic.Calendar/>,label:"Agenda"},
-            {id:"pacientes",icon:<Ic.Users/>,label:"Pacientes"},
-            {id:"cobros",icon:<Ic.Dollar/>,label:"Cobros"},
-            ...(isAdmin?[{id:"caja",icon:<Ic.Dollar/>,label:"Caja y finanzas"},{id:"config",icon:<Ic.Settings/>,label:"Configuración"}]:[]),
-          ].map(t=><button key={t.id} style={tabSt(t.id)} onClick={()=>setTab(t.id)}>{t.icon}{t.label}</button>)}
-        </div>
+      <div style={{flex:1,overflowY:"auto",padding:"1.25rem"}}>
 
-        <div style={{flex:1,overflowY:"auto",padding:"1.25rem"}}>
-
-          {/* ── AGENDA ── */}
-          {tab==="agenda"&&(
-            <div>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
-                <div><h2 style={{margin:0,fontSize:18}}>Agenda</h2><p style={{margin:"2px 0 0",fontSize:13,color:"#666"}}>Turnos diarios y semanales</p></div>
-                <Btn variant="primary" onClick={()=>setModal("turno")}><Ic.Plus/> Nuevo turno</Btn>
+        {/* ── AGENDA ── */}
+        {tab==="agenda" && <div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
+            <div><h2 style={{margin:0,fontSize:18}}>Agenda</h2><p style={{margin:"2px 0 0",fontSize:13,color:"#666"}}>Turnos diarios y semanales</p></div>
+            <Btn variant="primary" onClick={()=>setModal("turno")}>+ Nuevo turno</Btn>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem"}}>
+            <Card>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+                <span style={{fontWeight:500,fontSize:14}}>Vista diaria</span>
+                <input type="date" value={agDate} onChange={e=>setAgDate(e.target.value)} style={{fontSize:12,padding:"3px 6px",width:"auto"}}/>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem"}}>
-                <Card>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-                    <span style={{fontWeight:500,fontSize:14}}>Vista diaria</span>
-                    <input type="date" value={agDate} onChange={e=>setAgDate(e.target.value)} style={{fontSize:12,padding:"3px 6px",width:"auto"}}/>
+              {turnosDia.length===0 && <p style={{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}}>Sin turnos para este día</p>}
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {turnosDia.map(t=>{
+                  const p=byId(patients,t.pacienteId);
+                  return <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ececec"}}>
+                    <div style={{width:36,height:36,borderRadius:"50%",background:C.pLight,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:500,fontSize:12,color:C.primary,flexShrink:0}}>{p?p.nombre[0]+p.apellido[0]:"?"}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <p style={{margin:0,fontSize:13,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p?p.nombre+" "+p.apellido:"—"}</p>
+                      <p style={{margin:0,fontSize:11,color:"#666"}}>{t.hora} · <span style={{color:p?.sesiones===0?C.danger:"#666"}}>{p?.sesiones??0} ses.</span></p>
+                    </div>
+                    <Badge color={eCol(t.estado)} bg={eBg(t.estado)}>{t.estado}</Badge>
+                    <div style={{display:"flex",gap:3}}>
+                      {t.estado==="Pendiente" && <>
+                        <Btn small variant="primary" onClick={()=>markAsist(t.id,"Asistió")} style={{padding:"3px 7px"}}>✓</Btn>
+                        <Btn small variant="danger"  onClick={()=>markAsist(t.id,"Ausente")}  style={{padding:"3px 7px"}}>✗</Btn>
+                      </>}
+                      <Btn small onClick={()=>{setETurno({...t});setModal("editTurno");}} style={{padding:"3px 7px"}}>✏️</Btn>
+                    </div>
+                  </div>;
+                })}
+              </div>
+            </Card>
+            <Card>
+              <span style={{fontWeight:500,fontSize:14,display:"block",marginBottom:12}}>Vista semanal</span>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {turnosSem.map(({date,ts})=><div key={date} style={{borderLeft:"3px solid "+(date===today()?C.primary:"#ececec"),paddingLeft:10}}>
+                  <p style={{margin:"0 0 4px",fontSize:12,fontWeight:500,color:date===today()?C.primary:"#666"}}>
+                    {new Date(date+"T12:00").toLocaleDateString("es-AR",{weekday:"short",day:"numeric",month:"short"})}
+                    {date===today()&&<span style={{marginLeft:6,fontSize:10,background:C.primary,color:"#fff",borderRadius:4,padding:"1px 5px"}}>Hoy</span>}
+                  </p>
+                  {ts.length===0
+                    ? <p style={{margin:0,fontSize:11,color:"#999"}}>Sin turnos</p>
+                    : ts.map(t=>{const pp=byId(patients,t.pacienteId);return<p key={t.id} style={{margin:"2px 0",fontSize:12}}>{t.hora} — {pp?pp.nombre+" "+pp.apellido:"—"} <Badge color={eCol(t.estado)} bg={eBg(t.estado)}>{t.estado}</Badge></p>;})
+                  }
+                </div>)}
+              </div>
+            </Card>
+          </div>
+        </div>}
+
+        {/* ── PACIENTES ── */}
+        {tab==="pacientes" && <div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
+            <h2 style={{margin:0,fontSize:18}}>Pacientes</h2>
+            <Btn variant="primary" onClick={()=>setModal("paciente")}>+ Nuevo paciente</Btn>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"280px 1fr",gap:"1rem"}}>
+            <div>
+              <div style={{position:"relative",marginBottom:10}}>
+                <input placeholder="Buscar apellido o DNI…" value={search} onChange={e=>setSearch(e.target.value)} style={{paddingLeft:28}}/>
+                <span style={{position:"absolute",left:9,top:"50%",transform:"translateY(-50%)",color:"#999",pointerEvents:"none"}}>🔍</span>
+              </div>
+              {filteredPats.length===0 && <p style={{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}}>Sin pacientes</p>}
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {filteredPats.map(p=><div key={p.id} onClick={()=>setSelPat(p.id)} style={{padding:"10px 12px",borderRadius:10,border:"1px solid "+(selPat===p.id?C.primary:"#ececec"),background:selPat===p.id?C.pLight:"#fff",cursor:"pointer"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span style={{fontSize:13,fontWeight:500}}>{p.nombre} {p.apellido}</span>
                   </div>
-                  {turnosDia.length===0&&<p style={{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}}>Sin turnos para este día</p>}
-                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                    {turnosDia.map(t=>{const p=getPac(t.pacienteId);return(
-                      <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ececec"}}>
-                        <div style={{width:36,height:36,borderRadius:"50%",background:C.primaryLight,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:500,fontSize:12,color:C.primary,flexShrink:0}}>{p?p.nombre[0]+p.apellido[0]:"?"}</div>
-                        <div style={{flex:1,minWidth:0}}>
-                          <p style={{margin:0,fontSize:13,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p?`${p.nombre} ${p.apellido}`:"—"}</p>
-                          <p style={{margin:0,fontSize:11,color:"#666"}}><Ic.Clock/> {t.hora} · <span style={{color:p?.sesiones===0?C.danger:"#666"}}>{p?.sesiones??0} ses.</span></p>
-                        </div>
-                        <Badge color={eColor(t.estado)} bg={eBg(t.estado)}>{t.estado}</Badge>
-                        <div style={{display:"flex",gap:3}}>
-                          {t.estado==="Pendiente"&&<><Btn small variant="primary" onClick={()=>markAsistencia(t.id,"Asistió")} style={{padding:"3px 7px"}}><Ic.Check/></Btn><Btn small variant="danger" onClick={()=>markAsistencia(t.id,"Ausente")} style={{padding:"3px 7px"}}><Ic.X/></Btn></>}
-                          <Btn small onClick={()=>{setEditTurno({...t});setModal("editTurno");}} style={{padding:"3px 7px"}} title="Editar turno"><Ic.Edit/></Btn>
-                        </div>
-                      </div>
-                    );})}
-                  </div>
-                </Card>
-                <Card>
-                  <span style={{fontWeight:500,fontSize:14,display:"block",marginBottom:12}}>Vista semanal</span>
-                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                    {turnosSemana.map(({date,ts})=>(
-                      <div key={date} style={{borderLeft:`3px solid ${date===todayStr()?C.primary:"#ececec"}`,paddingLeft:10}}>
-                        <p style={{margin:"0 0 4px",fontSize:12,fontWeight:500,color:date===todayStr()?C.primary:"#666"}}>
-                          {new Date(date+"T12:00").toLocaleDateString("es-AR",{weekday:"short",day:"numeric",month:"short"})}
-                          {date===todayStr()&&<span style={{marginLeft:6,fontSize:10,background:C.primary,color:"#fff",borderRadius:4,padding:"1px 5px"}}>Hoy</span>}
-                        </p>
-                        {ts.length===0?<p style={{margin:0,fontSize:11,color:"#999"}}>Sin turnos</p>:ts.map(t=>{const pp=getPac(t.pacienteId);return<p key={t.id} style={{margin:"2px 0",fontSize:12}}>{t.hora} — {pp?`${pp.nombre} ${pp.apellido}`:"—"} <Badge color={eColor(t.estado)} bg={eBg(t.estado)}>{t.estado}</Badge></p>;})}
-                      </div>
-                    ))}
-                  </div>
-                </Card>
+                  <span style={{fontSize:11,color:"#666"}}>DNI {p.dni} · {p.sesiones} ses.</span>
+                </div>)}
               </div>
             </div>
-          )}
-
-          {/* ── PACIENTES ── */}
-          {tab==="pacientes"&&(
             <div>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
-                <h2 style={{margin:0,fontSize:18}}>Pacientes</h2>
-                <Btn variant="primary" onClick={()=>setModal("paciente")}><Ic.Plus/> Nuevo paciente</Btn>
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"280px 1fr",gap:"1rem"}}>
-                <div>
-                  <div style={{position:"relative",marginBottom:10}}>
-                    <span style={{position:"absolute",left:9,top:"50%",transform:"translateY(-50%)",color:"#999"}}><Ic.Search/></span>
-                    <input placeholder="Buscar apellido o DNI…" value={search} onChange={e=>setSearch(e.target.value)} style={{paddingLeft:28}}/>
-                  </div>
-                  {filteredPats.length===0&&<p style={{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}}>Sin pacientes</p>}
-                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                    {filteredPats.map(p=>{const bal=pendingBalance(p.id);return(
-                      <div key={p.id} onClick={()=>setSelPat(p.id)} style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${selPat===p.id?C.primary:"#ececec"}`,background:selPat===p.id?C.primaryLight:"#fff",cursor:"pointer"}}>
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                          <span style={{fontSize:13,fontWeight:500}}>{p.nombre} {p.apellido}</span>
-                          {bal>0&&<span style={{color:C.danger}}><Ic.Alert/></span>}
-                        </div>
-                        <span style={{fontSize:11,color:"#666"}}>DNI {p.dni} · {p.sesiones} ses.</span>
-                      </div>
-                    );})}
-                  </div>
-                </div>
-                {selPat?(()=>{const p=patients.find(pp=>pp.id===selPat);if(!p)return null;const bal=pendingBalance(p.id);return(<React.Fragment>
-                  <div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
-                    {bal>0&&<div style={{background:C.dangerLight,border:`1px solid ${C.danger}`,borderRadius:10,padding:"10px 14px",display:"flex",gap:10}}><Ic.Alert/><div><span style={{fontSize:13,fontWeight:500,color:C.danger}}>Saldo pendiente: {fmt(bal)}</span><p style={{margin:0,fontSize:11,color:C.danger}}>Plan sin pago total.</p></div></div>}
-                    <Card>
-                      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
-                        <div style={{width:44,height:44,borderRadius:"50%",background:C.primaryLight,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:500,fontSize:14,color:C.primary,flexShrink:0}}>{p.nombre[0]}{p.apellido[0]}</div>
-                        <div><p style={{margin:0,fontWeight:500,fontSize:15}}>{p.nombre} {p.apellido}</p><p style={{margin:0,fontSize:12,color:"#666"}}>DNI {p.dni} · {fmtDate(p.fechaNac)}</p></div>
-                        <div style={{marginLeft:"auto",textAlign:"right"}}><p style={{margin:0,fontSize:11,color:"#666"}}>Sesiones</p><p style={{margin:0,fontSize:22,fontWeight:500,color:p.sesiones===0?C.danger:C.primary}}>{p.sesiones}</p></div>
-                      </div>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"4px 12px",fontSize:12,borderTop:"1px solid #ececec",paddingTop:10}}>
-                        {[["Tel",p.tel],["Email",p.email],["Dir",p.dir]].map(([k,v])=><div key={k}><span style={{color:"#666"}}>{k}: </span>{v||"—"}</div>)}
-                      </div>
-                    </Card>
-                    <Card>
-                      <p style={{margin:"0 0 10px",fontWeight:500,fontSize:14}}>Vender plan</p>
-                      {plans.length===0?<p style={{fontSize:13,color:C.warn}}>{isAdmin?"Configurá planes primero.":"Pedile al admin que configure los planes."}</p>:(
-                        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                          {plans.map(pl=>(
-                            <div key={pl.id} style={{flex:1,minWidth:130,border:"1px solid #ececec",borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
-                              <p style={{margin:"0 0 2px",fontSize:13,fontWeight:500}}>{pl.name}</p>
-                              <p style={{margin:"0 0 4px",fontSize:11,color:"#666"}}>{pl.sessions} sesiones</p>
-                              <p style={{margin:"0 0 8px",fontSize:14,fontWeight:500,color:C.primary}}>{fmt(pl.price)}</p>
-                              <Btn small variant="primary" onClick={()=>venderPlan(p.id,pl.id)} style={{width:"100%",justifyContent:"center"}}>Vender</Btn>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </Card>
-                    <Card>
-                      <p style={{margin:"0 0 8px",fontWeight:500,fontSize:14}}>Seguimiento clínico</p>
-                      <textarea value={p.seguimiento||""} onChange={e=>setPatients(prev=>prev.map(pp=>pp.id===p.id?{...pp,seguimiento:e.target.value}:pp))} onBlur={e=>saveSeg(p.id,e.target.value)} rows={7} placeholder="Evolución, encuestas, notas…" style={{resize:"vertical",fontSize:13}}/>
-                      <p style={{margin:"4px 0 0",fontSize:11,color:"#999"}}>Se guarda al salir del campo.</p>
-                    </Card>
-                  </div>
-                );})()):(<Card style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:200,color:"#999"}}><p style={{margin:0,fontSize:13}}>Seleccioná un paciente</p></Card>)}
-              </div>
+              {selPat
+                ? <FichaPaciente
+                    p={patients.find(pp=>pp.id===selPat)||patients[0]}
+                    plans={plans} txs={txs} isAdmin={isAdmin}
+                    onSeguimiento={saveSeg} onVender={venderPlan}
+                  />
+                : <Card style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:200,color:"#999"}}>
+                    <p style={{margin:0,fontSize:13}}>Seleccioná un paciente</p>
+                  </Card>
+              }
             </div>
-          )}
+          </div>
+        </div>}
 
-          {/* ── COBROS ── */}
-          {tab==="cobros"&&(
-            <div>
-              <div style={{marginBottom:"1rem"}}>
-                <h2 style={{margin:0,fontSize:18}}>Cobros</h2>
-                <p style={{margin:"2px 0 0",fontSize:13,color:"#666"}}>Registrá señas, pagos totales o parciales</p>
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem"}}>
-                <Card>
-                  <p style={{margin:"0 0 12px",fontWeight:500,fontSize:14}}>Nuevo cobro</p>
-                  <Sel label="Paciente" value={nTx.pacienteId} onChange={e=>setNTx(p=>({...p,pacienteId:e.target.value,turnoId:""}))}>
-                    <option value="">Seleccionar paciente…</option>
-                    {patients.map(p=><option key={p.id} value={p.id}>{p.nombre} {p.apellido}</option>)}
-                  </Sel>
-                  <Sel label="Tipo de cobro" value={nTx.tipo} onChange={e=>setNTx(p=>({...p,tipo:e.target.value}))}>
-                    <option>Pago Total</option>
-                    <option>Seña</option>
-                    <option>Pago Parcial</option>
-                  </Sel>
-                  <Sel label="Método de pago" value={nTx.metodo} onChange={e=>setNTx(p=>({...p,metodo:e.target.value}))}>
-                    <option>Efectivo</option>
-                    <option>Transferencia</option>
-                  </Sel>
-                  <Sel label="Asociar a turno de hoy (opcional)" value={nTx.turnoId} onChange={e=>setNTx(p=>({...p,turnoId:e.target.value}))}>
-                    <option value="">Sin turno específico</option>
-                    {turnosHoy.filter(t=>!nTx.pacienteId||t.pacienteId===parseInt(nTx.pacienteId)).map(t=>{const pp=getPac(t.pacienteId);return<option key={t.id} value={t.id}>{t.hora} — {pp?`${pp.nombre} ${pp.apellido}`:"?"} ({t.estado})</option>;})}
-                  </Sel>
-                  <Sel label="Plan asociado (opcional)" value={nTx.planId} onChange={e=>setNTx(p=>({...p,planId:e.target.value}))}>
-                    <option value="">Sin plan</option>
-                    {plans.map(pl=><option key={pl.id} value={pl.id}>{pl.name} — {fmt(pl.price)}</option>)}
-                  </Sel>
-                  <Inp label="Monto ($)" type="number" placeholder="0" value={nTx.monto} onChange={e=>setNTx(p=>({...p,monto:e.target.value}))}/>
-                  <Btn variant="primary" onClick={addTx} disabled={!nTx.pacienteId||!nTx.monto} style={{width:"100%",justifyContent:"center",marginTop:4}}><Ic.Plus/> Registrar cobro</Btn>
-                </Card>
-                <Card>
-                  <p style={{margin:"0 0 12px",fontWeight:500,fontSize:14}}>Cobros del día</p>
-                  {txsHoy.filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido").length===0&&<p style={{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}}>Sin cobros registrados hoy</p>}
-                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                    {txsHoy.filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido").map(t=>{const pp=getPac(t.pacienteId);return(
-                      <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ececec"}}>
+        {/* ── COBROS ── */}
+        {tab==="cobros" && <div>
+          <div style={{marginBottom:"1rem"}}>
+            <h2 style={{margin:0,fontSize:18}}>Cobros</h2>
+            <p style={{margin:"2px 0 0",fontSize:13,color:"#666"}}>Registrá señas, pagos totales o parciales</p>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem"}}>
+            <Card>
+              <p style={{margin:"0 0 12px",fontWeight:500,fontSize:14}}>Nuevo cobro</p>
+              <Sel label="Paciente" value={nTx.pacienteId} onChange={e=>setNTx(p=>({...p,pacienteId:e.target.value,turnoId:""}))}>
+                <option value="">Seleccionar paciente…</option>
+                {patients.map(p=><option key={p.id} value={p.id}>{p.nombre} {p.apellido}</option>)}
+              </Sel>
+              <Sel label="Tipo de cobro" value={nTx.tipo} onChange={e=>setNTx(p=>({...p,tipo:e.target.value}))}>
+                <option>Pago Total</option><option>Seña</option><option>Pago Parcial</option>
+              </Sel>
+              <Sel label="Método" value={nTx.metodo} onChange={e=>setNTx(p=>({...p,metodo:e.target.value}))}>
+                <option>Efectivo</option><option>Transferencia</option>
+              </Sel>
+              <Sel label="Asociar a turno de hoy (opcional)" value={nTx.turnoId} onChange={e=>setNTx(p=>({...p,turnoId:e.target.value}))}>
+                <option value="">Sin turno específico</option>
+                {turnosHoy.filter(t=>!nTx.pacienteId||t.pacienteId===parseInt(nTx.pacienteId)).map(t=>{
+                  const pp=byId(patients,t.pacienteId);
+                  return <option key={t.id} value={t.id}>{t.hora} — {pp?pp.nombre+" "+pp.apellido:"?"} ({t.estado})</option>;
+                })}
+              </Sel>
+              <Sel label="Plan asociado (opcional)" value={nTx.planId} onChange={e=>setNTx(p=>({...p,planId:e.target.value}))}>
+                <option value="">Sin plan</option>
+                {plans.map(pl=><option key={pl.id} value={pl.id}>{pl.name} — {fmt(pl.price)}</option>)}
+              </Sel>
+              <Inp label="Monto ($)" type="number" placeholder="0" value={nTx.monto} onChange={e=>setNTx(p=>({...p,monto:e.target.value}))}/>
+              <Btn variant="primary" disabled={!nTx.pacienteId||!nTx.monto} onClick={addTx} style={{width:"100%",justifyContent:"center",marginTop:4}}>+ Registrar cobro</Btn>
+            </Card>
+            <Card>
+              <p style={{margin:"0 0 12px",fontWeight:500,fontSize:14}}>Cobros del día</p>
+              {txsHoy.filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido").length===0
+                ? <p style={{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}}>Sin cobros hoy</p>
+                : <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {txsHoy.filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido").map(t=>{
+                      const pp=byId(patients,t.pacienteId);
+                      return <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ececec"}}>
                         <div style={{flex:1}}>
-                          <p style={{margin:0,fontSize:13,fontWeight:500}}>{pp?`${pp.nombre} ${pp.apellido}`:"—"}</p>
+                          <p style={{margin:0,fontSize:13,fontWeight:500}}>{pp?pp.nombre+" "+pp.apellido:"—"}</p>
                           <p style={{margin:0,fontSize:11,color:"#666"}}>{t.tipo} · {t.fecha.slice(11,16)}</p>
                         </div>
                         <span style={{fontWeight:500,color:C.primary,fontSize:14}}>{fmt(t.monto)}</span>
-                        <Badge color={t.metodo==="Efectivo"?C.warn:C.info} bg={t.metodo==="Efectivo"?C.warnLight:C.infoLight}>{t.metodo}</Badge>
-                      </div>
-                    );})}
+                        <Badge color={t.metodo==="Efectivo"?C.warn:C.info} bg={t.metodo==="Efectivo"?C.wLight:C.iLight}>{t.metodo}</Badge>
+                      </div>;
+                    })}
                   </div>
-                </Card>
-              </div>
-            </div>
-          )}
+              }
+            </Card>
+          </div>
+        </div>}
 
-          {/* ── CAJA ADMIN ── */}
-          {tab==="caja"&&isAdmin&&(
-            <div>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
-                <h2 style={{margin:0,fontSize:18}}>Caja y finanzas</h2>
-                <Badge color={C.info} bg={C.infoLight}>Solo administrador</Badge>
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem",marginBottom:"1rem"}}>
-                <Card>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-                    <p style={{margin:0,fontWeight:500,fontSize:14}}>Reporte</p>
-                    <div style={{display:"flex",gap:4}}>{["diario","mensual"].map(v=><Btn key={v} small variant={repPer===v?"primary":"default"} onClick={()=>setRepPer(v)}>{v==="diario"?"Hoy":"Mes"}</Btn>)}</div>
-                  </div>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
-                    {[["Total",rep.total,C.primary,C.primaryLight],["Efectivo",rep.efectivo,C.warn,C.warnLight],["Transf.",rep.transfer,C.info,C.infoLight]].map(([l,v,color,bg])=>(
-                      <div key={l} style={{background:bg,borderRadius:8,padding:"10px 12px",textAlign:"center"}}><p style={{margin:"0 0 2px",fontSize:11,color}}>{l}</p><p style={{margin:0,fontSize:14,fontWeight:500,color}}>{fmt(v)}</p></div>
-                    ))}
-                  </div>
-                  <div style={{borderTop:"1px solid #ececec",paddingTop:10}}>
-                    {(repPer==="diario"?txsHoy:txsMes).filter(t=>t.estado==="Activo").map(t=>{const pp=getPac(t.pacienteId);return(<div key={t.id} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"3px 0",borderBottom:"1px solid #ececec"}}><span>{pp?`${pp.nombre} ${pp.apellido}`:"—"} · {t.tipo}</span><span style={{color:C.primary,fontWeight:500}}>{fmt(t.monto)}</span></div>);})}
-                  </div>
-                </Card>
-                <Card>
-                  <p style={{margin:"0 0 12px",fontWeight:500,fontSize:14}}>Transacciones del día</p>
-                  {txsHoy.length===0&&<p style={{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}}>Sin transacciones</p>}
-                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                    {txsHoy.map(t=>{const pp=getPac(t.pacienteId);return(
-                      <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:t.estado==="Anulado"?"#f8f8f8":"#fff",border:"1px solid #ececec",opacity:t.estado==="Anulado"?.5:1}}>
-                        <div style={{flex:1}}><p style={{margin:0,fontSize:13,fontWeight:500,textDecoration:t.estado==="Anulado"?"line-through":"none"}}>{pp?`${pp.nombre} ${pp.apellido}`:"—"}</p><p style={{margin:0,fontSize:11,color:"#666"}}>{t.tipo} · {t.metodo} · {t.fecha.slice(11,16)}</p></div>
-                        <span style={{fontWeight:500,color:t.estado==="Anulado"?"#999":C.primary}}>{fmt(t.monto)}</span>
-                        <Badge color={t.estado==="Activo"?C.primary:C.danger} bg={t.estado==="Activo"?C.primaryLight:C.dangerLight}>{t.estado}</Badge>
-                        {t.estado==="Activo"&&isAdmin&&<Btn small variant="danger" onClick={()=>anularTx(t.id)}><Ic.Trash/> Anular</Btn>}
-                      </div>
-                    );})}
-                  </div>
-                </Card>
-              </div>
-            </div>
-          )}
-
-          {/* ── CONFIGURACIÓN ── */}
-          {tab==="config"&&isAdmin&&(
-            <div>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
-                <div><h2 style={{margin:0,fontSize:18}}>Planes</h2><p style={{margin:"2px 0 0",fontSize:13,color:"#666"}}>Se guarda en Google Sheets</p></div>
-                <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                  {planMsg&&<span style={{fontSize:12,color:C.primary}}>{planMsg}</span>}
-                  <Btn onClick={addPlan}><Ic.Plus/> Agregar</Btn>
-                  <Btn variant="primary" onClick={savePlanes}><Ic.Save/> Guardar</Btn>
+        {/* ── CAJA ADMIN ── */}
+        {tab==="caja" && isAdmin && <div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
+            <h2 style={{margin:0,fontSize:18}}>Caja y finanzas</h2>
+            <Badge color={C.info} bg={C.iLight}>Solo administrador</Badge>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem"}}>
+            <Card>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+                <p style={{margin:0,fontWeight:500,fontSize:14}}>Reporte</p>
+                <div style={{display:"flex",gap:4}}>
+                  <Btn small variant={repPer==="diario"?"primary":"default"} onClick={()=>setRepPer("diario")}>Hoy</Btn>
+                  <Btn small variant={repPer==="mensual"?"primary":"default"} onClick={()=>setRepPer("mensual")}>Mes</Btn>
                 </div>
               </div>
-              <Card>
-                {editPlans.length===0&&<p style={{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}}>No hay planes.</p>}
-                <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                  {editPlans.map(pl=>(
-                    <div key={pl.id} style={{display:"grid",gridTemplateColumns:"1fr 110px 150px 36px",gap:10,alignItems:"center",padding:"10px 12px",borderRadius:10,border:"1px solid #ececec",background:"#f8f8f8"}}>
-                      <div><label style={{fontSize:11,color:"#666",display:"block",marginBottom:3}}>Nombre</label><input value={pl.name} onChange={e=>updatePlan(pl.id,"name",e.target.value)} style={{fontWeight:500}}/></div>
-                      <div><label style={{fontSize:11,color:"#666",display:"block",marginBottom:3}}>Sesiones</label><input type="number" min="1" value={pl.sessions} onChange={e=>updatePlan(pl.id,"sessions",e.target.value)}/></div>
-                      <div><label style={{fontSize:11,color:"#666",display:"block",marginBottom:3}}>Precio ($)</label><input type="number" min="0" value={pl.price} onChange={e=>updatePlan(pl.id,"price",e.target.value)}/></div>
-                      <Btn small variant="danger" onClick={()=>removePlan(pl.id)} style={{alignSelf:"flex-end",marginBottom:1}}><Ic.Trash/></Btn>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
+                {[["Total",rep.tot,C.primary,C.pLight],["Efectivo",rep.ef,C.warn,C.wLight],["Transf.",rep.tr,C.info,C.iLight]].map(([l,v,color,bg])=><div key={l} style={{background:bg,borderRadius:8,padding:"10px 12px",textAlign:"center"}}>
+                  <p style={{margin:"0 0 2px",fontSize:11,color}}>{l}</p>
+                  <p style={{margin:0,fontSize:14,fontWeight:500,color}}>{fmt(v)}</p>
+                </div>)}
+              </div>
+              <div style={{borderTop:"1px solid #ececec",paddingTop:10}}>
+                {(repPer==="diario"?txsHoy:txsMes).filter(t=>t.estado==="Activo").map(t=>{
+                  const pp=byId(patients,t.pacienteId);
+                  return <div key={t.id} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"3px 0",borderBottom:"1px solid #ececec"}}>
+                    <span>{pp?pp.nombre+" "+pp.apellido:"—"} · {t.tipo}</span>
+                    <span style={{color:C.primary,fontWeight:500}}>{fmt(t.monto)}</span>
+                  </div>;
+                })}
+              </div>
+            </Card>
+            <Card>
+              <p style={{margin:"0 0 12px",fontWeight:500,fontSize:14}}>Transacciones del día</p>
+              {txsHoy.length===0 && <p style={{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}}>Sin transacciones</p>}
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {txsHoy.map(t=>{
+                  const pp=byId(patients,t.pacienteId);
+                  return <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:t.estado==="Anulado"?"#f8f8f8":"#fff",border:"1px solid #ececec",opacity:t.estado==="Anulado"?.5:1}}>
+                    <div style={{flex:1}}>
+                      <p style={{margin:0,fontSize:13,fontWeight:500,textDecoration:t.estado==="Anulado"?"line-through":"none"}}>{pp?pp.nombre+" "+pp.apellido:"—"}</p>
+                      <p style={{margin:0,fontSize:11,color:"#666"}}>{t.tipo} · {t.metodo} · {t.fecha.slice(11,16)}</p>
                     </div>
-                  ))}
-                </div>
-                {editPlans.length>0&&(
-                  <div style={{marginTop:14,padding:"10px 12px",borderRadius:10,background:C.primaryLight,border:`1px solid ${C.primary}`}}>
-                    <p style={{margin:"0 0 8px",fontSize:12,color:C.primary,fontWeight:500}}>Vista previa</p>
-                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                      {editPlans.map(pl=><div key={pl.id} style={{background:"#fff",borderRadius:8,padding:"8px 12px",fontSize:12,border:"1px solid #ececec"}}><b>{pl.name}</b> · {pl.sessions} ses. · <span style={{color:C.primary,fontWeight:500}}>{fmt(pl.price)}</span></div>)}
-                    </div>
-                  </div>
-                )}
-              </Card>
+                    <span style={{fontWeight:500,color:t.estado==="Anulado"?"#999":C.primary}}>{fmt(t.monto)}</span>
+                    <Badge color={t.estado==="Activo"?C.primary:C.danger} bg={t.estado==="Activo"?C.pLight:C.dLight}>{t.estado}</Badge>
+                    {t.estado==="Activo" && <Btn small variant="danger" onClick={()=>anularTx(t.id)}>🗑 Anular</Btn>}
+                  </div>;
+                })}
+              </div>
+            </Card>
+          </div>
+        </div>}
+
+        {/* ── CONFIGURACIÓN ── */}
+        {tab==="config" && isAdmin && <div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
+            <div><h2 style={{margin:0,fontSize:18}}>Planes</h2><p style={{margin:"2px 0 0",fontSize:13,color:"#666"}}>Se guarda en Google Sheets</p></div>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              {planMsg && <span style={{fontSize:12,color:C.primary}}>{planMsg}</span>}
+              <Btn onClick={()=>setEPlans(p=>[...p,{id:nextId(p),name:"Nuevo Plan",sessions:1,price:0}])}>+ Agregar</Btn>
+              <Btn variant="primary" onClick={savePlanes}>💾 Guardar</Btn>
             </div>
-          )}
+          </div>
+          <Card>
+            {ePlans.length===0 && <p style={{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}}>No hay planes.</p>}
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {ePlans.map(pl=><div key={pl.id} style={{display:"grid",gridTemplateColumns:"1fr 110px 150px 36px",gap:10,alignItems:"center",padding:"10px 12px",borderRadius:10,border:"1px solid #ececec",background:"#f8f8f8"}}>
+                <div><label style={{fontSize:11,color:"#666",display:"block",marginBottom:3}}>Nombre</label><input value={pl.name} onChange={e=>setEPlans(p=>p.map(x=>x.id===pl.id?{...x,name:e.target.value}:x))} style={{fontWeight:500}}/></div>
+                <div><label style={{fontSize:11,color:"#666",display:"block",marginBottom:3}}>Sesiones</label><input type="number" min="1" value={pl.sessions} onChange={e=>setEPlans(p=>p.map(x=>x.id===pl.id?{...x,sessions:Number(e.target.value)}:x))}/></div>
+                <div><label style={{fontSize:11,color:"#666",display:"block",marginBottom:3}}>Precio ($)</label><input type="number" min="0" value={pl.price} onChange={e=>setEPlans(p=>p.map(x=>x.id===pl.id?{...x,price:Number(e.target.value)}:x))}/></div>
+                <Btn small variant="danger" onClick={()=>setEPlans(p=>p.filter(x=>x.id!==pl.id))} style={{alignSelf:"flex-end",marginBottom:1}}>🗑</Btn>
+              </div>)}
+            </div>
+            {ePlans.length>0 && <div style={{marginTop:14,padding:"10px 12px",borderRadius:10,background:C.pLight,border:"1px solid "+C.primary}}>
+              <p style={{margin:"0 0 8px",fontSize:12,color:C.primary,fontWeight:500}}>Vista previa</p>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {ePlans.map(pl=><div key={pl.id} style={{background:"#fff",borderRadius:8,padding:"8px 12px",fontSize:12,border:"1px solid #ececec"}}><b>{pl.name}</b> · {pl.sessions} ses. · <span style={{color:C.primary,fontWeight:500}}>{fmt(pl.price)}</span></div>)}
+              </div>
+            </div>}
+          </Card>
+        </div>}
+
+      </div>
+    </div>
+
+    {/* Modal nuevo turno */}
+    {modal==="turno" && <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50}}>
+      <div style={{background:"#fff",borderRadius:14,padding:"1.5rem",width:360,border:"1px solid #ececec"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <p style={{margin:0,fontWeight:500,fontSize:16}}>Agendar turno</p>
+          <Btn variant="ghost" small onClick={()=>setModal(null)}>✕</Btn>
+        </div>
+        <Sel label="Paciente" value={nTurno.pacienteId} onChange={e=>setNTurno(p=>({...p,pacienteId:e.target.value}))}>
+          <option value="">Seleccionar…</option>
+          {patients.map(p=><option key={p.id} value={p.id}>{p.nombre} {p.apellido}</option>)}
+        </Sel>
+        <Inp label="Fecha" type="date" value={nTurno.fecha} onChange={e=>setNTurno(p=>({...p,fecha:e.target.value}))}/>
+        <Sel label="Hora" value={nTurno.hora} onChange={e=>setNTurno(p=>({...p,hora:e.target.value}))}>
+          {HORAS.map(h=><option key={h} value={h}>{h}</option>)}
+        </Sel>
+        <div style={{display:"flex",gap:8,marginTop:8}}>
+          <Btn onClick={()=>setModal(null)} style={{flex:1,justifyContent:"center"}}>Cancelar</Btn>
+          <Btn variant="primary" onClick={addTurno} style={{flex:1,justifyContent:"center"}}>Confirmar</Btn>
         </div>
       </div>
+    </div>}
 
-      {/* Modal nuevo turno */}
-      {modal==="turno"&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50}}>
-          <div style={{background:"#fff",borderRadius:14,padding:"1.5rem",width:360,border:"1px solid #ececec"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}><p style={{margin:0,fontWeight:500,fontSize:16}}>Agendar turno</p><Btn variant="ghost" small onClick={()=>setModal(null)}><Ic.X/></Btn></div>
-            <Sel label="Paciente" value={nTurno.pacienteId} onChange={e=>setNTurno(p=>({...p,pacienteId:e.target.value}))}><option value="">Seleccionar…</option>{patients.map(p=><option key={p.id} value={p.id}>{p.nombre} {p.apellido}</option>)}</Sel>
-            <Inp label="Fecha" type="date" value={nTurno.fecha} onChange={e=>setNTurno(p=>({...p,fecha:e.target.value}))}/>
-            <Sel label="Hora" value={nTurno.hora} onChange={e=>setNTurno(p=>({...p,hora:e.target.value}))}>{HORAS.map(h=><option key={h} value={h}>{h}</option>)}</Sel>
-            <div style={{display:"flex",gap:8,marginTop:8}}><Btn onClick={()=>setModal(null)} style={{flex:1,justifyContent:"center"}}>Cancelar</Btn><Btn variant="primary" onClick={addTurno} style={{flex:1,justifyContent:"center"}}>Confirmar</Btn></div>
-          </div>
+    {/* Modal editar turno */}
+    {modal==="editTurno" && eTurno && <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50}}>
+      <div style={{background:"#fff",borderRadius:14,padding:"1.5rem",width:360,border:"1px solid #ececec"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <p style={{margin:0,fontWeight:500,fontSize:16}}>Editar turno</p>
+          <Btn variant="ghost" small onClick={()=>{setModal(null);setETurno(null);}}>✕</Btn>
         </div>
-      )}
+        <div style={{marginBottom:12,padding:"8px 12px",borderRadius:8,background:C.pLight,fontSize:13,fontWeight:500}}>
+          {byId(patients,eTurno.pacienteId)?.nombre} {byId(patients,eTurno.pacienteId)?.apellido}
+        </div>
+        <Inp label="Nueva fecha" type="date" value={eTurno.fecha} onChange={e=>setETurno(t=>({...t,fecha:e.target.value}))}/>
+        <Sel label="Nueva hora" value={eTurno.hora} onChange={e=>setETurno(t=>({...t,hora:e.target.value}))}>
+          {HORAS.map(h=><option key={h} value={h}>{h}</option>)}
+        </Sel>
+        <div style={{display:"flex",gap:8,marginTop:8}}>
+          <Btn onClick={()=>{setModal(null);setETurno(null);}} style={{flex:1,justifyContent:"center"}}>Cancelar</Btn>
+          <Btn variant="primary" onClick={saveEditTurno} style={{flex:1,justifyContent:"center"}}>Guardar</Btn>
+        </div>
+      </div>
+    </div>}
 
-      {/* Modal editar turno */}
-      {modal==="editTurno"&&editTurno&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50}}>
-          <div style={{background:"#fff",borderRadius:14,padding:"1.5rem",width:360,border:"1px solid #ececec"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}><p style={{margin:0,fontWeight:500,fontSize:16}}>Editar turno</p><Btn variant="ghost" small onClick={()=>{setModal(null);setEditTurno(null);}}><Ic.X/></Btn></div>
-            <div style={{marginBottom:12,padding:"8px 12px",borderRadius:8,background:C.primaryLight,fontSize:13,fontWeight:500}}>{getPac(editTurno.pacienteId)?.nombre} {getPac(editTurno.pacienteId)?.apellido}</div>
-            <Inp label="Nueva fecha" type="date" value={editTurno.fecha} onChange={e=>setEditTurno(t=>({...t,fecha:e.target.value}))}/>
-            <Sel label="Nueva hora" value={editTurno.hora} onChange={e=>setEditTurno(t=>({...t,hora:e.target.value}))}>{HORAS.map(h=><option key={h} value={h}>{h}</option>)}</Sel>
-            <div style={{display:"flex",gap:8,marginTop:8}}><Btn onClick={()=>{setModal(null);setEditTurno(null);}} style={{flex:1,justifyContent:"center"}}>Cancelar</Btn><Btn variant="primary" onClick={saveEditTurno} style={{flex:1,justifyContent:"center"}}>Guardar</Btn></div>
-          </div>
+    {/* Modal nuevo paciente */}
+    {modal==="paciente" && <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50}}>
+      <div style={{background:"#fff",borderRadius:14,padding:"1.5rem",width:400,border:"1px solid #ececec",maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <p style={{margin:0,fontWeight:500,fontSize:16}}>Nuevo paciente</p>
+          <Btn variant="ghost" small onClick={()=>setModal(null)}>✕</Btn>
         </div>
-      )}
+        {[["nombre","Nombre","text"],["apellido","Apellido","text"],["dni","DNI","text"],["fechaNac","Fecha de nacimiento","date"],["tel","Teléfono","tel"],["email","Email","email"],["dir","Dirección","text"]].map(([k,l,t])=>(
+          <Inp key={k} label={l} type={t} value={nPac[k]} onChange={e=>setNPac(p=>({...p,[k]:e.target.value}))}/>
+        ))}
+        <div style={{display:"flex",gap:8,marginTop:8}}>
+          <Btn onClick={()=>setModal(null)} style={{flex:1,justifyContent:"center"}}>Cancelar</Btn>
+          <Btn variant="primary" onClick={addPaciente} style={{flex:1,justifyContent:"center"}}>Registrar</Btn>
+        </div>
+      </div>
+    </div>}
 
-      {/* Modal nuevo paciente */}
-      {modal==="paciente"&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50}}>
-          <div style={{background:"#fff",borderRadius:14,padding:"1.5rem",width:400,border:"1px solid #ececec",maxHeight:"90vh",overflowY:"auto"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}><p style={{margin:0,fontWeight:500,fontSize:16}}>Nuevo paciente</p><Btn variant="ghost" small onClick={()=>setModal(null)}><Ic.X/></Btn></div>
-            {[["nombre","Nombre","text"],["apellido","Apellido","text"],["dni","DNI","text"],["fechaNac","Fecha de nacimiento","date"],["tel","Teléfono","tel"],["email","Email","email"],["dir","Dirección","text"]].map(([k,l,t])=>(
-              <Inp key={k} label={l} type={t} value={nPac[k]} onChange={e=>setNPac(p=>({...p,[k]:e.target.value}))}/>
-            ))}
-            <div style={{display:"flex",gap:8,marginTop:8}}><Btn onClick={()=>setModal(null)} style={{flex:1,justifyContent:"center"}}>Cancelar</Btn><Btn variant="primary" onClick={addPaciente} style={{flex:1,justifyContent:"center"}}>Registrar</Btn></div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  </div>;
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
