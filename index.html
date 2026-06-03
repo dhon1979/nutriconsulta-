@@ -28,8 +28,9 @@ const fmt=n=>new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maxi
 const fmtD=d=>{try{return new Date(d).toLocaleDateString("es-AR")}catch{return d}};
 const today=()=>new Date().toISOString().slice(0,10);
 const now=()=>{const d=new Date();return d.toISOString().slice(0,10)+"T"+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");};
-const eCol=e=>e==="Asistió"?C.primary:e==="Ausente"?C.danger:C.warn;
-const eBg=e=>e==="Asistió"?C.pL:e==="Ausente"?C.dL:C.wL;
+const normEstado=e=>{if(!e)return"Pendiente";const s=e.trim();if(s.toLowerCase().includes("asisti"))return"Asistió";if(s.toLowerCase().includes("ausen"))return"Ausente";return"Pendiente";};
+const eCol=e=>{const n=normEstado(e);return n==="Asistió"?C.primary:n==="Ausente"?C.danger:C.warn;};
+const eBg=e=>{const n=normEstado(e);return n==="Asistió"?C.pL:n==="Ausente"?C.dL:C.wL;};
 
 function normFecha(v){if(!v)return"";const s=String(v).trim();if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);try{const d=new Date(s);if(!isNaN(d))return d.toISOString().slice(0,10);}catch{}return s;}
 function normHora(v){if(!v)return"";const s=String(v).trim();if(/^\d{2}:\d{2}/.test(s))return s.slice(0,5);try{const d=new Date(s);if(!isNaN(d))return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}catch{}return s;}
@@ -207,7 +208,7 @@ function App(){
       setPatients(pa.map(p=>({...p,id:Number(p.id),sesiones:Number(p.sesiones||0)})));
       setLoadMsg("Cargando turnos...");
       const tu=await sheetsGet("turnos");
-      setTurnos(tu.map(t=>({...t,id:Number(t.id),pacienteId:Number(t.pacienteId),fecha:normFecha(t.fecha),hora:normHora(t.hora)})));
+      setTurnos(tu.map(t=>({...t,id:Number(t.id),pacienteId:Number(t.pacienteId),fecha:normFecha(t.fecha),hora:normHora(t.hora),estado:normEstado(t.estado)})));
       setLoadMsg("Cargando transacciones...");
       const tx=await sheetsGet("transacciones");
       setTxs(tx.map(t=>({...t,id:Number(t.id),pacienteId:Number(t.pacienteId),monto:Number(t.monto),fecha:normDT(t.fecha),planId:t.planId?Number(t.planId):null,turnoId:t.turnoId?Number(t.turnoId):null})));
@@ -293,7 +294,13 @@ function App(){
 
   // totalizador hoy
   const tdHoy=turnos.filter(t=>t.fecha===today());
-  const totales={total:tdHoy.length,asistio:tdHoy.filter(t=>t.estado==="Asistió").length,pendiente:tdHoy.filter(t=>t.estado==="Pendiente").length,ausente:tdHoy.filter(t=>t.estado==="Ausente").length,cobrado:txsHoy.filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido").length};
+  const totales={
+    total:tdHoy.length,
+    asistio:tdHoy.filter(t=>normEstado(t.estado)==="Asistió").length,
+    pendiente:tdHoy.filter(t=>normEstado(t.estado)==="Pendiente").length,
+    ausente:tdHoy.filter(t=>normEstado(t.estado)==="Ausente").length,
+    cobrado:txsHoy.filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido").length
+  };
 
   // reporte caja
   const cobList=l=>l.filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido");
