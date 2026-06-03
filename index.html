@@ -509,51 +509,31 @@ function App(){
             h("h2",{style:{margin:0,fontSize:18}},"Cobros"),
             h("p",{style:{margin:"2px 0 0",fontSize:13,color:"#666"}},"Registrá señas, pagos totales o parciales")
           ),
-          h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem"}},
-            h(Card,{},
-              h("p",{style:{margin:"0 0 12px",fontWeight:500,fontSize:14}},"Nuevo cobro"),
-              h(SelEl,{label:"Paciente",value:nTx.pacienteId,onChange:e=>setNTx(p=>({...p,pacienteId:e.target.value,turnoId:""}))},
-                h("option",{value:""},"Seleccionar paciente..."),
-                ...patients.map(p=>h("option",{key:p.id,value:p.id},p.nombre+" "+p.apellido))
-              ),
-              h(SelEl,{label:"Tipo de cobro",value:nTx.tipo,onChange:e=>setNTx(p=>({...p,tipo:e.target.value}))},
-                h("option",{},"Pago Total"),h("option",{},"Seña"),h("option",{},"Pago Parcial")
-              ),
-              h(SelEl,{label:"Método",value:nTx.metodo,onChange:e=>setNTx(p=>({...p,metodo:e.target.value}))},
-                h("option",{},"Efectivo"),h("option",{},"Transferencia")
-              ),
-              h(SelEl,{label:"Turno de hoy (opcional)",value:nTx.turnoId,onChange:e=>setNTx(p=>({...p,turnoId:e.target.value}))},
-                h("option",{value:""},"Sin turno específico"),
-                ...turnosHoy.filter(t=>!nTx.pacienteId||t.pacienteId===parseInt(nTx.pacienteId)).map(t=>{
-                  const pp=byId(patients,t.pacienteId);
-                  return h("option",{key:t.id,value:t.id},t.hora+" — "+(pp?pp.nombre+" "+pp.apellido:"?")+" ("+t.estado+")");
-                })
-              ),
-              h(SelEl,{label:"Plan (opcional)",value:nTx.planId,onChange:e=>setNTx(p=>({...p,planId:e.target.value}))},
-                h("option",{value:""},"Sin plan"),
-                ...plans.map(pl=>h("option",{key:pl.id,value:pl.id},pl.name+" — "+fmt(pl.price)))
-              ),
-              h(Inp,{label:"Monto ($)",type:"number",placeholder:"0",value:nTx.monto,onChange:e=>setNTx(p=>({...p,monto:e.target.value}))}),
-              h(Btn,{variant:"primary",disabled:!nTx.pacienteId||!nTx.monto,onClick:addTx,style:{width:"100%",justifyContent:"center",marginTop:4}},"+ Registrar cobro")
+          h(Card,{style:{maxWidth:480}},
+            h("p",{style:{margin:"0 0 12px",fontWeight:500,fontSize:14}},"Nuevo cobro"),
+            h(SelEl,{label:"Paciente",value:nTx.pacienteId,onChange:e=>setNTx(p=>({...p,pacienteId:e.target.value,turnoId:""}))},
+              h("option",{value:""},"Seleccionar paciente..."),
+              ...patients.map(p=>h("option",{key:p.id,value:p.id},p.nombre+" "+p.apellido))
             ),
-            h(Card,{},
-              h("p",{style:{margin:"0 0 12px",fontWeight:500,fontSize:14}},"Cobros del día"),
-              txsHoy.filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido").length===0
-                ? h("p",{style:{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}},"Sin cobros registrados hoy")
-                : h("div",{style:{display:"flex",flexDirection:"column",gap:6}},
-                    txsHoy.filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido").map(t=>{
-                      const pp=byId(patients,t.pacienteId);
-                      return h("div",{key:t.id,style:{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ececec"}},
-                        h("div",{style:{flex:1}},
-                          h("p",{style:{margin:0,fontSize:13,fontWeight:500}},pp?pp.nombre+" "+pp.apellido:"—"),
-                          h("p",{style:{margin:0,fontSize:11,color:"#666"}},t.tipo+" · "+t.fecha.replace("T"," ").slice(0,16))
-                        ),
-                        h("span",{style:{fontWeight:500,color:C.primary,fontSize:14}},fmt(t.monto)),
-                        h(Badge,{color:t.metodo==="Efectivo"?C.warn:C.info,bg:t.metodo==="Efectivo"?C.wL:C.iL,text:t.metodo})
-                      );
-                    })
-                  )
-            )
+            h(SelEl,{label:"Tipo de cobro",value:nTx.tipo,onChange:e=>setNTx(p=>({...p,tipo:e.target.value}))},
+              h("option",{},"Pago Total"),h("option",{},"Seña"),h("option",{},"Pago Parcial")
+            ),
+            h(SelEl,{label:"Método",value:nTx.metodo,onChange:e=>setNTx(p=>({...p,metodo:e.target.value}))},
+              h("option",{},"Efectivo"),h("option",{},"Transferencia")
+            ),
+            h(SelEl,{label:"Turno de hoy (opcional)",value:nTx.turnoId,onChange:e=>setNTx(p=>({...p,turnoId:e.target.value}))},
+              h("option",{value:""},"Sin turno específico"),
+              ...turnosHoy.filter(t=>!nTx.pacienteId||t.pacienteId===parseInt(nTx.pacienteId)).map(t=>{
+                const pp=byId(patients,t.pacienteId);
+                return h("option",{key:t.id,value:t.id},t.hora+" — "+(pp?pp.nombre+" "+pp.apellido:"?")+" ("+t.estado+")");
+              })
+            ),
+            h(SelEl,{label:"Plan (opcional)",value:nTx.planId,onChange:e=>setNTx(p=>({...p,planId:e.target.value}))},
+              h("option",{value:""},"Sin plan"),
+              ...plans.map(pl=>h("option",{key:pl.id,value:pl.id},pl.name+" — "+fmt(pl.price)))
+            ),
+            h(Inp,{label:"Monto ($)",type:"number",placeholder:"0",value:nTx.monto,onChange:e=>setNTx(p=>({...p,monto:e.target.value}))}),
+            h(Btn,{variant:"primary",disabled:!nTx.pacienteId||!nTx.monto,onClick:addTx,style:{width:"100%",justifyContent:"center",marginTop:4}},"+ Registrar cobro")
           )
         ),
 
@@ -566,14 +546,17 @@ function App(){
           h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem"}},
             h(Card,{},
               h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}},
-                h("p",{style:{margin:0,fontWeight:500,fontSize:14}},"Reporte"),
+                h("p",{style:{margin:0,fontWeight:500,fontSize:14}},"Reporte de cobros"),
                 h("div",{style:{display:"flex",gap:4}},
                   h(Btn,{small:true,variant:repPer==="diario"?"primary":"default",onClick:()=>setRepPer("diario")},"Hoy"),
                   h(Btn,{small:true,variant:repPer==="mensual"?"primary":"default",onClick:()=>setRepPer("mensual")},"Mes")
                 )
               ),
               h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}},
-                [["Total",rep.tot,C.primary,C.pL],["Efectivo",rep.ef,C.warn,C.wL],["Transf.",rep.tr,C.info,C.iL]].map(([l,v,color,bg])=>
+                [["Total",(repPer==="diario"?txsHoy:txsMes).filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido").reduce((s,t)=>s+t.monto,0),C.primary,C.pL],
+                 ["Efectivo",(repPer==="diario"?txsHoy:txsMes).filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido"&&t.metodo==="Efectivo").reduce((s,t)=>s+t.monto,0),C.warn,C.wL],
+                 ["Transferencia",(repPer==="diario"?txsHoy:txsMes).filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido"&&t.metodo==="Transferencia").reduce((s,t)=>s+t.monto,0),C.info,C.iL]
+                ].map(([l,v,color,bg])=>
                   h("div",{key:l,style:{background:bg,borderRadius:8,padding:"10px 12px",textAlign:"center"}},
                     h("p",{style:{margin:"0 0 2px",fontSize:11,color}},l),
                     h("p",{style:{margin:0,fontSize:14,fontWeight:500,color}},fmt(v))
@@ -581,33 +564,58 @@ function App(){
                 )
               ),
               h("div",{style:{borderTop:"1px solid #ececec",paddingTop:10}},
-                (repPer==="diario"?txsHoy:txsMes).filter(t=>t.estado==="Activo").map(t=>{
-                  const pp=byId(patients,t.pacienteId);
-                  return h("div",{key:t.id,style:{display:"flex",justifyContent:"space-between",fontSize:12,padding:"3px 0",borderBottom:"1px solid #ececec"}},
-                    h("span",{},(pp?pp.nombre+" "+pp.apellido:"—")+" · "+t.tipo),
-                    h("span",{style:{color:C.primary,fontWeight:500}},fmt(t.monto))
-                  );
-                })
+                h("p",{style:{margin:"0 0 6px",fontSize:12,fontWeight:500,color:"#666"}},"Detalle"),
+                (repPer==="diario"?txsHoy:txsMes).filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido").length===0
+                  ? h("p",{style:{fontSize:13,color:"#999",textAlign:"center",padding:"8px 0"}},"Sin cobros en este período")
+                  : (repPer==="diario"?txsHoy:txsMes).filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido").map(t=>{
+                      const pp=byId(patients,t.pacienteId);
+                      return h("div",{key:t.id,style:{display:"flex",justifyContent:"space-between",fontSize:12,padding:"4px 0",borderBottom:"1px solid #ececec",alignItems:"center"}},
+                        h("span",{},(pp?pp.nombre+" "+pp.apellido:"—")+" · "+t.tipo+" · "+t.metodo),
+                        h("span",{style:{color:C.primary,fontWeight:500}},fmt(t.monto))
+                      );
+                    })
               )
             ),
             h(Card,{},
-              h("p",{style:{margin:"0 0 12px",fontWeight:500,fontSize:14}},"Transacciones del día"),
-              txsHoy.length===0 && h("p",{style:{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}},"Sin transacciones"),
-              h("div",{style:{display:"flex",flexDirection:"column",gap:6}},
-                txsHoy.map(t=>{
-                  const pp=byId(patients,t.pacienteId);
-                  return h("div",{key:t.id,style:{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:t.estado==="Anulado"?"#f8f8f8":"#fff",border:"1px solid #ececec",opacity:t.estado==="Anulado"?.5:1}},
-                    h("div",{style:{flex:1}},
-                      h("p",{style:{margin:0,fontSize:13,fontWeight:500,textDecoration:t.estado==="Anulado"?"line-through":"none"}},pp?pp.nombre+" "+pp.apellido:"—"),
-                      h("p",{style:{margin:0,fontSize:11,color:"#666"}},t.tipo+" · "+t.metodo+" · "+t.fecha.replace("T"," ").slice(11,16))
-                    ),
-                    h("span",{style:{fontWeight:500,color:t.estado==="Anulado"?"#999":C.primary}},fmt(t.monto)),
-                    h(Badge,{color:t.estado==="Activo"?C.primary:C.danger,bg:t.estado==="Activo"?C.pL:C.dL,text:t.estado}),
-                    t.estado==="Activo" && h(Btn,{small:true,variant:"danger",onClick:()=>anularTx(t.id)},"🗑 Anular")
-                  );
-                })
-              )
+              h("p",{style:{margin:"0 0 12px",fontWeight:500,fontSize:14}},"Cobros del día — con anulación"),
+              txsHoy.filter(t=>t.tipo!=="Plan vendido").length===0
+                ? h("p",{style:{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}},"Sin cobros hoy")
+                : h("div",{style:{display:"flex",flexDirection:"column",gap:6}},
+                    txsHoy.filter(t=>t.tipo!=="Plan vendido").map(t=>{
+                      const pp=byId(patients,t.pacienteId);
+                      return h("div",{key:t.id,style:{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:t.estado==="Anulado"?"#f8f8f8":"#fff",border:"1px solid #ececec",opacity:t.estado==="Anulado"?.5:1}},
+                        h("div",{style:{flex:1}},
+                          h("p",{style:{margin:0,fontSize:13,fontWeight:500,textDecoration:t.estado==="Anulado"?"line-through":"none"}},pp?pp.nombre+" "+pp.apellido:"—"),
+                          h("p",{style:{margin:0,fontSize:11,color:"#666"}},t.tipo+" · "+t.metodo+" · "+t.fecha.replace("T"," ").slice(11,16))
+                        ),
+                        h("span",{style:{fontWeight:500,color:t.estado==="Anulado"?"#999":C.primary}},fmt(t.monto)),
+                        h(Badge,{color:t.estado==="Activo"?C.primary:C.danger,bg:t.estado==="Activo"?C.pL:C.dL,text:t.estado}),
+                        t.estado==="Activo" && h(Btn,{small:true,variant:"danger",onClick:()=>anularTx(t.id)},"🗑 Anular")
+                      );
+                    })
+                  )
             )
+          ),
+          // Ventas de planes del día
+          h(Card,{style:{marginTop:"1rem"}},
+            h("p",{style:{margin:"0 0 12px",fontWeight:500,fontSize:14}},"Ventas de planes del día"),
+            txsHoy.filter(t=>t.tipo==="Plan vendido").length===0
+              ? h("p",{style:{fontSize:13,color:"#666",textAlign:"center",padding:"8px 0"}},"Sin ventas de planes hoy")
+              : h("div",{style:{display:"flex",flexDirection:"column",gap:6}},
+                  txsHoy.filter(t=>t.tipo==="Plan vendido").map(t=>{
+                    const pp=byId(patients,t.pacienteId);
+                    const pl=byId(plans,t.planId);
+                    return h("div",{key:t.id,style:{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:t.estado==="Anulado"?"#f8f8f8":"#fff",border:"1px solid #ececec",opacity:t.estado==="Anulado"?.5:1}},
+                      h("div",{style:{flex:1}},
+                        h("p",{style:{margin:0,fontSize:13,fontWeight:500,textDecoration:t.estado==="Anulado"?"line-through":"none"}},pp?pp.nombre+" "+pp.apellido:"—"),
+                        h("p",{style:{margin:0,fontSize:11,color:"#666"}},(pl?pl.name:"Plan")+" · "+t.fecha.replace("T"," ").slice(11,16))
+                      ),
+                      h("span",{style:{fontWeight:500,color:t.estado==="Anulado"?"#999":C.primary}},fmt(t.monto)),
+                      h(Badge,{color:t.estado==="Activo"?C.primary:C.danger,bg:t.estado==="Activo"?C.pL:C.dL,text:t.estado}),
+                      t.estado==="Activo" && h(Btn,{small:true,variant:"danger",onClick:()=>anularTx(t.id)},"🗑 Anular")
+                    );
+                  })
+                )
           )
         ),
 
