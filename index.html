@@ -392,7 +392,7 @@ function App(){
                       h("p",{style:{margin:0,fontSize:13,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}},pac?(pac.nombre+" "+pac.apellido):"—"),
                       h("p",{style:{margin:0,fontSize:11,color:"#666"}},t.hora+" · "+(pac?.sesiones??0)+" ses.")
                     ),
-                    h(Badge,{color:eCol(t.estado),bg:eBg(t.estado),text:t.estado}),
+                    h(Badge,{color:eCol(t.estado),bg:eBg(t.estado),text:normEstado(t.estado)}),
                     h("div",{style:{display:"flex",gap:3}},
                       t.estado==="Pendiente"&&h(Btn,{key:"as",small:true,variant:"primary",onClick:()=>markAsist(t.id,"Asistió"),style:{padding:"3px 7px"}},"V"),
                       t.estado==="Pendiente"&&h(Btn,{key:"au",small:true,variant:"danger",onClick:()=>markAsist(t.id,"Ausente"),style:{padding:"3px 7px"}},"X"),
@@ -418,7 +418,7 @@ function App(){
                       date===today()&&h("span",{style:{marginLeft:6,fontSize:10,background:C.primary,color:"#fff",borderRadius:4,padding:"1px 5px"}},"Hoy")
                     ),
                     ts.length===0?h("p",{style:{margin:0,fontSize:11,color:"#999"}},"Sin turnos"):
-                    ts.map(t=>{const pp=byId(patients,t.pacienteId);return h("p",{key:t.id,style:{margin:"2px 0",fontSize:12}},t.hora+" - "+(pp?pp.nombre+" "+pp.apellido:"—")," ",h(Badge,{color:eCol(t.estado),bg:eBg(t.estado),text:t.estado}));})
+                    ts.map(t=>{const pp=byId(patients,t.pacienteId);return h("p",{key:t.id,style:{margin:"2px 0",fontSize:12}},t.hora+" - "+(pp?pp.nombre+" "+pp.apellido:"—")," ",h(Badge,{color:eCol(t.estado),bg:eBg(t.estado),text:normEstado(t.estado)}));})
                   )
                 )
               )
