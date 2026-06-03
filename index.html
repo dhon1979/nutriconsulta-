@@ -366,7 +366,7 @@ function App(){
                     );})}
                   </div>
                 </div>
-                {selPat?(()=>{const p=patients.find(pp=>pp.id===selPat);if(!p)return null;const bal=pendingBalance(p.id);return(
+                {selPat?(()=>{const p=patients.find(pp=>pp.id===selPat);if(!p)return null;const bal=pendingBalance(p.id);return(<React.Fragment>
                   <div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
                     {bal>0&&<div style={{background:C.dangerLight,border:`1px solid ${C.danger}`,borderRadius:10,padding:"10px 14px",display:"flex",gap:10}}><Ic.Alert/><div><span style={{fontSize:13,fontWeight:500,color:C.danger}}>Saldo pendiente: {fmt(bal)}</span><p style={{margin:0,fontSize:11,color:C.danger}}>Plan sin pago total.</p></div></div>}
                     <Card>
