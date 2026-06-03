@@ -28,7 +28,10 @@ const HORAS = Array.from({length:28},(_,i)=>{const h2=Math.floor(i*20/60+8),m=(i
 const fmt = n => new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}).format(n);
 const fmtD = d => {try{return new Date(d).toLocaleDateString("es-AR")}catch{return d}};
 const today = () => new Date().toISOString().slice(0,10);
-const now = () => new Date().toISOString().slice(0,16);
+const now   = () => {
+  const d=new Date();
+  return d.toISOString().slice(0,10)+"T"+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+};
 
 // Normaliza cualquier fecha al formato YYYY-MM-DD
 function normFecha(v){
@@ -48,12 +51,23 @@ function normHora(v){
   try{ const d=new Date(s); if(!isNaN(d)) return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }catch{}
   return s;
 }
-// Normaliza datetime a YYYY-MM-DDTHH:MM
+// Normaliza datetime a YYYY-MM-DDTHH:MM (acepta espacio o T como separador)
 function normDatetime(v){
   if(!v) return "";
-  const s = String(v);
+  const s = String(v).trim();
+  // con T
   if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return s.slice(0,16);
+  // con espacio: "2026-06-03 14:35"
+  if(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(s)) return s.slice(0,10)+"T"+s.slice(11,16);
   try{ const d=new Date(s); if(!isNaN(d)) return d.toISOString().slice(0,16); }catch{}
+  return s;
+}
+// Extrae YYYY-MM-DD de cualquier formato de fecha/datetime
+function dateOf(v){
+  if(!v) return "";
+  const s = String(v).trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  try{ const d=new Date(s); if(!isNaN(d)) return d.toISOString().slice(0,10); }catch{}
   return s;
 }
 const eCol = e => e==="Asistió"?C.primary:e==="Ausente"?C.danger:C.warn;
@@ -254,8 +268,8 @@ function App(){
     finally{setSaving(false);}
   };
 
-  const turnosDia=useMemo(()=>turnos.filter(t=>t.fecha===agDate).sort((a,b)=>a.hora.localeCompare(b.hora)),[turnos,agDate]);
-  const turnosHoy=useMemo(()=>turnos.filter(t=>t.fecha===today()),[turnos]);
+  const turnosDia=useMemo(()=>turnos.filter(t=>normFecha(t.fecha)===agDate).sort((a,b)=>a.hora.localeCompare(b.hora)),[turnos,agDate]);
+  const turnosHoy=useMemo(()=>turnos.filter(t=>normFecha(t.fecha)===today()),[turnos]);
   const turnosSem=useMemo(()=>{
     const d=new Date(agDate),dow=d.getDay(),mon=new Date(d);
     mon.setDate(d.getDate()-(dow===0?6:dow-1));
@@ -265,8 +279,8 @@ function App(){
       return {date,ts:turnos.filter(t=>t.fecha===date).sort((a,b)=>a.hora.localeCompare(b.hora))};
     });
   },[turnos,agDate]);
-  const txsHoy=useMemo(()=>txs.filter(t=>t.fecha.slice(0,10)===today()),[txs]);
-  const txsMes=useMemo(()=>txs.filter(t=>t.fecha.slice(0,7)===today().slice(0,7)),[txs]);
+  const txsHoy=useMemo(()=>txs.filter(t=>dateOf(t.fecha)===today()),[txs]);
+  const txsMes=useMemo(()=>txs.filter(t=>dateOf(t.fecha).slice(0,7)===today().slice(0,7)),[txs]);
   const calcRep=list=>{const a=list.filter(t=>t.estado==="Activo");return{ef:a.filter(t=>t.metodo==="Efectivo").reduce((s,t)=>s+t.monto,0),tr:a.filter(t=>t.metodo==="Transferencia").reduce((s,t)=>s+t.monto,0),tot:a.reduce((s,t)=>s+t.monto,0)};};
   const rep=calcRep(repPer==="diario"?txsHoy:txsMes);
   const filteredPats=useMemo(()=>patients.filter(p=>p.dni.includes(search)||p.apellido.toLowerCase().includes(search.toLowerCase())||p.nombre.toLowerCase().includes(search.toLowerCase())),[patients,search]);
@@ -300,10 +314,11 @@ function App(){
   }
   async function venderPlan(pid,planId){
     const pl=plans.find(p=>p.id===planId);if(!pl)return;
-    const nP=patients.map(p=>p.id===pid?{...p,sesiones:p.sesiones+pl.sessions}:p);
+    const nP=patients.map(p=>p.id===pid?{...p,sesiones:(Number(p.sesiones)||0)+pl.sessions}:p);
     const nT=[...txs,{id:nextId(txs),pacienteId:pid,tipo:"Plan vendido",metodo:"—",monto:pl.price,fecha:now(),estado:"Activo",planId,turnoId:null}];
     setPatients(nP);setTxs(nT);
-    await save("pacientes",nP);await save("transacciones",nT);
+    await save("pacientes",nP);
+    await save("transacciones",nT);
   }
   async function addTx(){
     if(!nTx.monto||!nTx.pacienteId)return;
@@ -531,7 +546,7 @@ function App(){
                       return h("div",{key:t.id,style:{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ececec"}},
                         h("div",{style:{flex:1}},
                           h("p",{style:{margin:0,fontSize:13,fontWeight:500}},pp?pp.nombre+" "+pp.apellido:"—"),
-                          h("p",{style:{margin:0,fontSize:11,color:"#666"}},t.tipo+" · "+t.fecha.slice(11,16))
+                          h("p",{style:{margin:0,fontSize:11,color:"#666"}},t.tipo+" · "+t.fecha.replace("T"," ").slice(0,16))
                         ),
                         h("span",{style:{fontWeight:500,color:C.primary,fontSize:14}},fmt(t.monto)),
                         h(Badge,{color:t.metodo==="Efectivo"?C.warn:C.info,bg:t.metodo==="Efectivo"?C.wL:C.iL,text:t.metodo})
@@ -584,7 +599,7 @@ function App(){
                   return h("div",{key:t.id,style:{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:t.estado==="Anulado"?"#f8f8f8":"#fff",border:"1px solid #ececec",opacity:t.estado==="Anulado"?.5:1}},
                     h("div",{style:{flex:1}},
                       h("p",{style:{margin:0,fontSize:13,fontWeight:500,textDecoration:t.estado==="Anulado"?"line-through":"none"}},pp?pp.nombre+" "+pp.apellido:"—"),
-                      h("p",{style:{margin:0,fontSize:11,color:"#666"}},t.tipo+" · "+t.metodo+" · "+t.fecha.slice(11,16))
+                      h("p",{style:{margin:0,fontSize:11,color:"#666"}},t.tipo+" · "+t.metodo+" · "+t.fecha.replace("T"," ").slice(11,16))
                     ),
                     h("span",{style:{fontWeight:500,color:t.estado==="Anulado"?"#999":C.primary}},fmt(t.monto)),
                     h(Badge,{color:t.estado==="Activo"?C.primary:C.danger,bg:t.estado==="Activo"?C.pL:C.dL,text:t.estado}),
