@@ -237,9 +237,9 @@ function App(){
 
   async function markAsist(tid,estado){
     let nP=patients;
-    const nT=turnos.map(t=>{if(t.id!==tid)return t;if(estado==="Asistio")nP=patients.map(p=>p.id===t.pacienteId&&p.sesiones>0?{...p,sesiones:p.sesiones-1}:p);return{...t,estado};});
+    const nT=turnos.map(t=>{if(t.id!==tid)return t;if(estado==="Asistió")nP=patients.map(p=>p.id===t.pacienteId&&p.sesiones>0?{...p,sesiones:p.sesiones-1}:p);return{...t,estado};});
     setTurnos(nT);setPatients(nP);
-    await save("turnos",nT);if(estado==="Asistio")await save("pacientes",nP);
+    await save("turnos",nT);if(estado==="Asistió")await save("pacientes",nP);
   }
   async function addTurno(){
     if(!nTurno.pacienteId||!nTurno.fecha||!nTurno.hora)return;
@@ -293,7 +293,7 @@ function App(){
 
   // totalizador hoy
   const tdHoy=turnos.filter(t=>t.fecha===today());
-  const totales={total:tdHoy.length,asistio:tdHoy.filter(t=>t.estado==="Asistio").length,pendiente:tdHoy.filter(t=>t.estado==="Pendiente").length,ausente:tdHoy.filter(t=>t.estado==="Ausente").length,cobrado:txsHoy.filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido").length};
+  const totales={total:tdHoy.length,asistio:tdHoy.filter(t=>t.estado==="Asistió").length,pendiente:tdHoy.filter(t=>t.estado==="Pendiente").length,ausente:tdHoy.filter(t=>t.estado==="Ausente").length,cobrado:txsHoy.filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido").length};
 
   // reporte caja
   const cobList=l=>l.filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido");
@@ -387,7 +387,7 @@ function App(){
                     ),
                     h(Badge,{color:eCol(t.estado),bg:eBg(t.estado),text:t.estado}),
                     h("div",{style:{display:"flex",gap:3}},
-                      t.estado==="Pendiente"&&h(Btn,{key:"as",small:true,variant:"primary",onClick:()=>markAsist(t.id,"Asistio"),style:{padding:"3px 7px"}},"V"),
+                      t.estado==="Pendiente"&&h(Btn,{key:"as",small:true,variant:"primary",onClick:()=>markAsist(t.id,"Asistió"),style:{padding:"3px 7px"}},"V"),
                       t.estado==="Pendiente"&&h(Btn,{key:"au",small:true,variant:"danger",onClick:()=>markAsist(t.id,"Ausente"),style:{padding:"3px 7px"}},"X"),
                       h(Btn,{key:"ed",small:true,onClick:()=>{setETurno({...t});setModal("editTurno");},style:{padding:"3px 7px"}},"E"),
                       h(Btn,{key:"co",small:true,onClick:()=>{
