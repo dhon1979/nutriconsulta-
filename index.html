@@ -384,8 +384,9 @@ function App(){
               ),
               turnosDia.length===0&&h("p",{style:{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}},"Sin turnos para este dia"),
               h("div",{style:{display:"flex",flexDirection:"column",gap:8}},
-                turnosDia.map(t=>{
+                                  turnosDia.map(t=>{
                   const pac=byId(patients,t.pacienteId);
+                  const pagado=txs.some(tx=>tx.turnoId===t.id&&tx.estado==="Activo"&&tx.tipo!=="Plan vendido");
                   return h("div",{key:t.id,style:{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ececec"}},
                     h("div",{style:{width:36,height:36,borderRadius:"50%",background:C.pL,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:500,fontSize:12,color:C.primary,flexShrink:0}},pac?(pac.nombre[0]+pac.apellido[0]):"?"),
                     h("div",{style:{flex:1,minWidth:0}},
@@ -393,6 +394,7 @@ function App(){
                       h("p",{style:{margin:0,fontSize:11,color:"#666"}},t.hora+" · "+(pac?.sesiones??0)+" ses.")
                     ),
                     h(Badge,{color:eCol(t.estado),bg:eBg(t.estado),text:normEstado(t.estado)}),
+                    h(Badge,{color:pagado?C.primary:"#888",bg:pagado?C.pL:"#f0f0f0",text:pagado?"Pagado":"Sin cobro"}),
                     h("div",{style:{display:"flex",gap:3}},
                       t.estado==="Pendiente"&&h(Btn,{key:"as",small:true,variant:"primary",onClick:()=>markAsist(t.id,"Asistió"),style:{padding:"3px 7px"}},"V"),
                       t.estado==="Pendiente"&&h(Btn,{key:"au",small:true,variant:"danger",onClick:()=>markAsist(t.id,"Ausente"),style:{padding:"3px 7px"}},"X"),
