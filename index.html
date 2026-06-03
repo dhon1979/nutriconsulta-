@@ -29,6 +29,33 @@ const fmt = n => new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",
 const fmtD = d => {try{return new Date(d).toLocaleDateString("es-AR")}catch{return d}};
 const today = () => new Date().toISOString().slice(0,10);
 const now = () => new Date().toISOString().slice(0,16);
+
+// Normaliza cualquier fecha al formato YYYY-MM-DD
+function normFecha(v){
+  if(!v) return "";
+  const s = String(v);
+  // ya es YYYY-MM-DD
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  // es un Date.toString() — parsear
+  try{ const d=new Date(s); if(!isNaN(d)) return d.toISOString().slice(0,10); }catch{}
+  return s;
+}
+// Normaliza hora a HH:MM
+function normHora(v){
+  if(!v) return "";
+  const s = String(v);
+  if(/^\d{2}:\d{2}/.test(s)) return s.slice(0,5);
+  try{ const d=new Date(s); if(!isNaN(d)) return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }catch{}
+  return s;
+}
+// Normaliza datetime a YYYY-MM-DDTHH:MM
+function normDatetime(v){
+  if(!v) return "";
+  const s = String(v);
+  if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return s.slice(0,16);
+  try{ const d=new Date(s); if(!isNaN(d)) return d.toISOString().slice(0,16); }catch{}
+  return s;
+}
 const eCol = e => e==="Asistió"?C.primary:e==="Ausente"?C.danger:C.warn;
 const eBg  = e => e==="Asistió"?C.pL:e==="Ausente"?C.dL:C.wL;
 
@@ -210,10 +237,10 @@ function App(){
       setPatients(pa.map(p=>({...p,id:Number(p.id),sesiones:Number(p.sesiones||0)})));
       setLoadMsg("Cargando turnos...");
       const tu=await sheetsGet("turnos");
-      setTurnos(tu.map(t=>({...t,id:Number(t.id),pacienteId:Number(t.pacienteId)})));
+      setTurnos(tu.map(t=>({...t,id:Number(t.id),pacienteId:Number(t.pacienteId),fecha:normFecha(t.fecha),hora:normHora(t.hora)})));
       setLoadMsg("Cargando transacciones...");
       const tx=await sheetsGet("transacciones");
-      setTxs(tx.map(t=>({...t,id:Number(t.id),pacienteId:Number(t.pacienteId),monto:Number(t.monto),planId:t.planId?Number(t.planId):null,turnoId:t.turnoId?Number(t.turnoId):null})));
+      setTxs(tx.map(t=>({...t,id:Number(t.id),pacienteId:Number(t.pacienteId),monto:Number(t.monto),fecha:normDatetime(t.fecha),planId:t.planId?Number(t.planId):null,turnoId:t.turnoId?Number(t.turnoId):null})));
     }catch(e){setErrMsg(e.message||"Error al conectar.");}
     finally{setLoading(false);setLoadMsg("");}
   },[]);
