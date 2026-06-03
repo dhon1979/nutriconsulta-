@@ -8,147 +8,124 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #1a1a1a; }
-  input, select, textarea, button { font-family: inherit; font-size: 13px; outline: none; }
-  input, select, textarea { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 6px 10px; color: #1a1a1a; }
-  input:focus, select:focus, textarea:focus { border-color: #1D9E75; }
-  ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
-  /* CSS vars */
-  :root {
-    --color-background-primary: #ffffff;
-    --color-background-secondary: #f8f8f8;
-    --color-background-tertiary: #f0f0f0;
-    --color-text-primary: #1a1a1a;
-    --color-text-secondary: #666;
-    --color-border-secondary: #e0e0e0;
-    --color-border-tertiary: #ececec;
-    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;color:#1a1a1a}
+input,select,textarea,button{font-family:inherit;font-size:13px;outline:none}
+input,select,textarea{background:#fff;border:1px solid #ddd;border-radius:6px;padding:6px 10px;color:#1a1a1a;width:100%}
+input:focus,select:focus,textarea:focus{border-color:#1D9E75}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:#ddd;border-radius:3px}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useMemo, useEffect, useCallback } = React;
+const {useState,useMemo,useEffect,useCallback}=React;
 
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyR2_dqgSMmAbfHfFqWYyb_RZGRjFoq_lp4GFtl3pZqP1WTZf8IcU5MJAxXzks2B7fe/exec";
+const SCRIPT_URL="https://script.google.com/macros/s/AKfycbyR2_dqgSMmAbfHfFqWYyb_RZGRjFoq_lp4GFtl3pZqP1WTZf8IcU5MJAxXzks2B7fe/exec";
 
-function sheetsGet(sheet) {
-  return new Promise((resolve, reject) => {
-    const cb = "cb_" + Math.random().toString(36).slice(2);
-    const script = document.createElement("script");
-    const timer = setTimeout(() => { delete window[cb]; document.body.removeChild(script); reject(new Error("Timeout")); }, 15000);
-    window[cb] = (data) => { clearTimeout(timer); delete window[cb]; document.body.removeChild(script); if (data && data.error) reject(new Error(data.error)); else resolve(Array.isArray(data) ? data : []); };
-    script.src = `${SCRIPT_URL}?sheet=${encodeURIComponent(sheet)}&callback=${cb}`;
-    script.onerror = () => { clearTimeout(timer); reject(new Error("Error de red")); };
-    document.body.appendChild(script);
+function sheetsGet(sheet){
+  return new Promise((resolve,reject)=>{
+    const cb="cb_"+Math.random().toString(36).slice(2);
+    const s=document.createElement("script");
+    const t=setTimeout(()=>{delete window[cb];document.body.removeChild(s);reject(new Error("Timeout"));},15000);
+    window[cb]=(d)=>{clearTimeout(t);delete window[cb];document.body.removeChild(s);d&&d.error?reject(new Error(d.error)):resolve(Array.isArray(d)?d:[]);};
+    s.src=`${SCRIPT_URL}?sheet=${encodeURIComponent(sheet)}&callback=${cb}`;
+    s.onerror=()=>{clearTimeout(t);reject(new Error("Error de red"));};
+    document.body.appendChild(s);
+  });
+}
+function sheetsWrite(sheet,rows){
+  return new Promise((resolve,reject)=>{
+    const cb="cb_"+Math.random().toString(36).slice(2);
+    const s=document.createElement("script");
+    const t=setTimeout(()=>{delete window[cb];document.body.removeChild(s);reject(new Error("Timeout"));},20000);
+    window[cb]=(d)=>{clearTimeout(t);delete window[cb];document.body.removeChild(s);d&&d.error?reject(new Error(d.error)):resolve(d);};
+    const payload=encodeURIComponent(JSON.stringify({sheet,rows}));
+    s.src=`${SCRIPT_URL}?action=write&callback=${cb}&payload=${payload}`;
+    s.onerror=()=>{clearTimeout(t);reject(new Error("Error de red"));};
+    document.body.appendChild(s);
   });
 }
 
-function sheetsWrite(sheet, rows) {
-  return new Promise((resolve, reject) => {
-    const cb = "cb_" + Math.random().toString(36).slice(2);
-    const script = document.createElement("script");
-    const timer = setTimeout(() => { delete window[cb]; document.body.removeChild(script); reject(new Error("Timeout")); }, 20000);
-    window[cb] = (data) => { clearTimeout(timer); delete window[cb]; document.body.removeChild(script); if (data && data.error) reject(new Error(data.error)); else resolve(data); };
-    const payload = encodeURIComponent(JSON.stringify({ sheet, rows }));
-    script.src = `${SCRIPT_URL}?action=write&callback=${cb}&payload=${payload}`;
-    script.onerror = () => { clearTimeout(timer); reject(new Error("Error de red")); };
-    document.body.appendChild(script);
-  });
-}
+const PINS={secretaria:"1234",admin:"9999"};
+const fmt=n=>new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}).format(n);
+const fmtDate=d=>{try{return new Date(d).toLocaleDateString("es-AR")}catch{return d}};
+const todayStr=()=>new Date().toISOString().slice(0,10);
+const nowStr=()=>new Date().toISOString().slice(0,16);
+const C={primary:"#1D9E75",primaryLight:"#E1F5EE",danger:"#E24B4A",dangerLight:"#FCEBEB",warn:"#BA7517",warnLight:"#FAEEDA",info:"#378ADD",infoLight:"#E6F1FB"};
+const eColor=e=>e==="Asistió"?C.primary:e==="Ausente"?C.danger:C.warn;
+const eBg=e=>e==="Asistió"?C.primaryLight:e==="Ausente"?C.dangerLight:C.warnLight;
 
-const PINS = { secretaria:"1234", admin:"9999" };
-const fmt = n => new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}).format(n);
-const fmtDate = d => { try { return new Date(d).toLocaleDateString("es-AR"); } catch { return d; } };
-const todayStr = () => new Date().toISOString().slice(0,10);
-const nowStr   = () => new Date().toISOString().slice(0,16);
-const C = { primary:"#1D9E75", primaryLight:"#E1F5EE", danger:"#E24B4A", dangerLight:"#FCEBEB", warn:"#BA7517", warnLight:"#FAEEDA", info:"#378ADD", infoLight:"#E6F1FB" };
-const estadoColor = e => e==="Asistió"?C.primary:e==="Ausente"?C.danger:C.warn;
-const estadoBg    = e => e==="Asistió"?C.primaryLight:e==="Ausente"?C.dangerLight:C.warnLight;
+// SVG Icons
+const Ic={
+  Calendar:()=><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+  Users:()=><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  Dollar:()=><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+  Settings:()=><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06-.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+  Plus:()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  Search:()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+  X:()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  Check:()=><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>,
+  Clock:()=><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  Alert:()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
+  Trash:()=><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>,
+  EyeOff:()=><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>,
+  Refresh:()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>,
+  Save:()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
+  Edit:()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+};
 
-const Logo = ({ size=48 }) => { const r=size*0.22,cx=size/2,cy=size/2,off=r*0.72; return (<svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="none">{[[cx,cy-off],[cx+off,cy],[cx,cy+off],[cx-off,cy]].map(([x,y],i)=><circle key={i} cx={x} cy={y} r={r} stroke="#4a4a4a" strokeWidth={size*0.025} fill="none"/>)}</svg>); };
-const LogoFull = ({ compact }) => (<div style={{display:"flex",flexDirection:compact?"row":"column",alignItems:"center",gap:compact?8:4}}><Logo size={compact?32:72}/><div style={{textAlign:compact?"left":"center"}}><div style={{display:"flex",alignItems:"center",gap:6,justifyContent:compact?"flex-start":"center"}}><span style={{fontFamily:"Georgia,serif",fontSize:compact?16:28,fontWeight:400,letterSpacing:0.5}}>Nutrición</span><span style={{background:"#3BBFB2",color:"#fff",fontSize:compact?9:11,fontWeight:700,padding:compact?"1px 5px":"2px 7px",borderRadius:5,letterSpacing:1,textTransform:"uppercase"}}>Salta</span></div>{!compact&&<p style={{margin:0,fontSize:12,color:C.warn,fontStyle:"italic"}}>Volvé a entender tu cuerpo</p>}</div></div>);
+const Logo=({size=48})=>{ const r=size*0.22,cx=size/2,cy=size/2,off=r*0.72; return(<svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="none">{[[cx,cy-off],[cx+off,cy],[cx,cy+off],[cx-off,cy]].map(([x,y],i)=><circle key={i} cx={x} cy={y} r={r} stroke="#4a4a4a" strokeWidth={size*0.025} fill="none"/>)}</svg>);};
+const LogoFull=({compact})=>(<div style={{display:"flex",flexDirection:compact?"row":"column",alignItems:"center",gap:compact?8:4}}><Logo size={compact?32:72}/><div style={{textAlign:compact?"left":"center"}}><div style={{display:"flex",alignItems:"center",gap:6,justifyContent:compact?"flex-start":"center"}}><span style={{fontFamily:"Georgia,serif",fontSize:compact?16:28,fontWeight:400,letterSpacing:.5}}>Nutrición</span><span style={{background:"#3BBFB2",color:"#fff",fontSize:compact?9:11,fontWeight:700,padding:compact?"1px 5px":"2px 7px",borderRadius:5,letterSpacing:1,textTransform:"uppercase"}}>Salta</span></div>{!compact&&<p style={{margin:0,fontSize:12,color:"#888",fontStyle:"italic"}}>Volvé a entender tu cuerpo</p>}</div></div>);
 
-const Badge = ({color,bg,children}) => <span style={{background:bg,color,fontSize:11,fontWeight:500,padding:"2px 8px",borderRadius:99,display:"inline-block",whiteSpace:"nowrap"}}>{children}</span>;
-const Card  = ({children,style={}}) => <div style={{background:"#fff",border:"0.5px solid #ececec",borderRadius:12,padding:"1rem 1.25rem",...style}}>{children}</div>;
-const Btn   = ({onClick,children,variant="default",small,style={},disabled}) => {
-  const base = {cursor:disabled?"not-allowed":"pointer",border:"1px solid #e0e0e0",borderRadius:8,padding:small?"4px 10px":"7px 14px",fontSize:small?12:13,fontWeight:500,display:"inline-flex",alignItems:"center",gap:5,opacity:disabled?0.5:1,...style};
-  const v = {default:{background:"#fff",color:"#1a1a1a"},primary:{background:C.primary,color:"#fff",border:"none"},danger:{background:C.dangerLight,color:C.danger,border:`1px solid ${C.danger}`},ghost:{background:"transparent",border:"none",color:"#666"}};
+const Badge=({color,bg,children})=><span style={{background:bg,color,fontSize:11,fontWeight:500,padding:"2px 8px",borderRadius:99,display:"inline-block",whiteSpace:"nowrap"}}>{children}</span>;
+const Card=({children,style={}})=><div style={{background:"#fff",border:"1px solid #ececec",borderRadius:12,padding:"1rem 1.25rem",...style}}>{children}</div>;
+const Btn=({onClick,children,variant="default",small,style={},disabled})=>{
+  const base={cursor:disabled?"not-allowed":"pointer",border:"1px solid #e0e0e0",borderRadius:8,padding:small?"4px 10px":"7px 14px",fontSize:small?12:13,fontWeight:500,display:"inline-flex",alignItems:"center",gap:5,opacity:disabled?.5:1,...style};
+  const v={default:{background:"#fff",color:"#1a1a1a"},primary:{background:C.primary,color:"#fff",border:"none"},danger:{background:C.dangerLight,color:C.danger,border:`1px solid ${C.danger}`},ghost:{background:"transparent",border:"none",color:"#666"}};
   return <button onClick={disabled?undefined:onClick} style={{...base,...v[variant]}}>{children}</button>;
 };
-const Input = ({label,...props}) => (<div style={{marginBottom:10}}>{label&&<label style={{fontSize:12,color:"#666",display:"block",marginBottom:3}}>{label}</label>}<input style={{width:"100%"}} {...props}/></div>);
-const Sel   = ({label,children,...props}) => (<div style={{marginBottom:10}}>{label&&<label style={{fontSize:12,color:"#666",display:"block",marginBottom:3}}>{label}</label>}<select style={{width:"100%"}} {...props}>{children}</select></div>);
-const Spinner = ({size=16,color="currentColor"}) => (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{animation:"spin 1s linear infinite",flexShrink:0}}><style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style><circle cx="12" cy="12" r="10" stroke={color} strokeWidth="3" strokeDasharray="31" strokeDashoffset="10" strokeLinecap="round"/></svg>);
+const Inp=({label,...p})=>(<div style={{marginBottom:10}}>{label&&<label style={{fontSize:12,color:"#666",display:"block",marginBottom:3}}>{label}</label>}<input {...p}/></div>);
+const Sel=({label,children,...p})=>(<div style={{marginBottom:10}}>{label&&<label style={{fontSize:12,color:"#666",display:"block",marginBottom:3}}>{label}</label>}<select {...p}>{children}</select></div>);
+const Spin=({size=16,color="currentColor"})=>(<svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{animation:"spin 1s linear infinite",flexShrink:0}}><style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style><circle cx="12" cy="12" r="10" stroke={color} strokeWidth="3" strokeDasharray="31" strokeDashoffset="10" strokeLinecap="round"/></svg>);
 
-// Icons SVG inline
-const ICalendar = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
-const IUsers    = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
-const IDollar   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>;
-const ISettings = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>;
-const IPlus     = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
-const ISearch   = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
-const IX        = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
-const ICheck    = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>;
-const IClock    = () => <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
-const IAlert    = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
-const ITrash    = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>;
-const IEyeOff   = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>;
-const IShield   = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>;
-const IRefresh  = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>;
-const ISave     = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>;
+const HORAS=Array.from({length:28},(_,i)=>{const h=Math.floor(i*20/60+8),m=(i*20)%60;return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0");});
 
-// ── PIN Modal ─────────────────────────────────────────────────────────────────
-const PinModal = ({ pendingRole, onSuccess, onCancel }) => {
-  const [pin, setPin] = useState("");
-  const [err, setErr] = useState(false);
-  useEffect(() => {
-    const fn = e => {
-      if (e.key>="0"&&e.key<="9") handleKey(e.key);
-      else if (e.key==="Backspace") handleKey("⌫");
-      else if (e.key==="Escape") onCancel();
-    };
-    window.addEventListener("keydown", fn);
-    return () => window.removeEventListener("keydown", fn);
+// ── PIN ───────────────────────────────────────────────────────────────────────
+function PinModal({pendingRole,onSuccess,onCancel}){
+  const [pin,setPin]=useState("");
+  const [err,setErr]=useState(false);
+  useEffect(()=>{
+    const fn=e=>{if(e.key>="0"&&e.key<="9")hk(e.key);else if(e.key==="Backspace")hk("⌫");else if(e.key==="Escape")onCancel();};
+    window.addEventListener("keydown",fn);return()=>window.removeEventListener("keydown",fn);
   });
-  const handleKey = k => {
-    if (k==="") return;
-    if (k==="⌫") { setPin(p=>p.slice(0,-1)); setErr(false); return; }
-    if (pin.length>=4) return;
-    const np = pin+String(k); setPin(np); setErr(false);
-    if (np.length===4) {
-      if (np===PINS[pendingRole]) onSuccess();
-      else { setErr(true); setTimeout(()=>{ setPin(""); setErr(false); }, 700); }
-    }
+  const hk=k=>{
+    if(k==="")return;if(k==="⌫"){setPin(p=>p.slice(0,-1));setErr(false);return;}
+    if(pin.length>=4)return;
+    const np=pin+String(k);setPin(np);setErr(false);
+    if(np.length===4){if(np===PINS[pendingRole])onSuccess();else{setErr(true);setTimeout(()=>{setPin("");setErr(false);},700);}}
   };
-  return (
+  return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50}}>
       <div style={{background:"#fff",borderRadius:14,padding:"1.5rem",width:300,border:"1px solid #ececec",textAlign:"center"}}>
         <p style={{margin:"0 0 4px",fontWeight:500,fontSize:15}}>Ingresá tu PIN</p>
         <p style={{margin:"0 0 1rem",fontSize:12,color:"#666"}}>Rol: {pendingRole==="admin"?"Administrador":"Secretaría"}</p>
         <div style={{display:"flex",justifyContent:"center",gap:10,marginBottom:12}}>
-          {[0,1,2,3].map(i=>(
-            <div key={i} style={{width:32,height:40,borderRadius:8,border:`1.5px solid ${err?C.danger:pin.length>i?C.primary:"#ddd"}`,background:"#f8f8f8",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color:err?C.danger:C.primary,transition:"border-color .2s"}}>
-              {pin.length>i?"●":""}
-            </div>
-          ))}
+          {[0,1,2,3].map(i=><div key={i} style={{width:32,height:40,borderRadius:8,border:`1.5px solid ${err?C.danger:pin.length>i?C.primary:"#ddd"}`,background:"#f8f8f8",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color:err?C.danger:C.primary}}>{pin.length>i?"●":""}</div>)}
         </div>
-        {err&&<p style={{margin:"0 0 8px",fontSize:12,color:C.danger}}>PIN incorrecto. Intentá de nuevo.</p>}
+        {err&&<p style={{margin:"0 0 8px",fontSize:12,color:C.danger}}>PIN incorrecto.</p>}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
-          {[1,2,3,4,5,6,7,8,9,"",0,"⌫"].map((k,i)=>(
-            <button key={i} onClick={()=>handleKey(k)} disabled={k===""} style={{padding:"12px 0",borderRadius:8,border:"1px solid #ececec",background:k===""?"transparent":"#f8f8f8",cursor:k===""?"default":"pointer",fontSize:16,fontWeight:500,color:"#1a1a1a",opacity:k===""?0:1}}>{k}</button>
-          ))}
+          {[1,2,3,4,5,6,7,8,9,"",0,"⌫"].map((k,i)=><button key={i} onClick={()=>hk(k)} disabled={k===""} style={{padding:"12px 0",borderRadius:8,border:"1px solid #ececec",background:k===""?"transparent":"#f8f8f8",cursor:k===""?"default":"pointer",fontSize:16,fontWeight:500,opacity:k===""?0:1}}>{k}</button>)}
         </div>
         <Btn onClick={onCancel} style={{width:"100%",justifyContent:"center"}}>Cancelar</Btn>
       </div>
     </div>
   );
-};
+}
 
-const LoginScreen = ({ onLogin }) => {
-  const [pending, setPending] = useState(null);
-  return (
+function LoginScreen({onLogin}){
+  const [pending,setPending]=useState(null);
+  return(
     <div style={{minHeight:"100vh",background:"#f5f5f5",display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div style={{background:"#fff",border:"1px solid #ececec",borderRadius:16,padding:"2rem",width:320,textAlign:"center"}}>
         <div style={{margin:"0 auto 1.5rem"}}><LogoFull/></div>
@@ -165,181 +142,184 @@ const LoginScreen = ({ onLogin }) => {
       {pending&&<PinModal pendingRole={pending} onSuccess={()=>{onLogin(pending);setPending(null);}} onCancel={()=>setPending(null)}/>}
     </div>
   );
-};
+}
 
 // ── App ───────────────────────────────────────────────────────────────────────
-function App() {
-  const [role,setRole]           = useState(null);
-  const [tab,setTab]             = useState("agenda");
-  const [patients,setPatients]   = useState([]);
-  const [turnos,setTurnos]       = useState([]);
-  const [txs,setTxs]             = useState([]);
-  const [plans,setPlans]         = useState([]);
-  const [loading,setLoading]     = useState(false);
-  const [loadMsg,setLoadMsg]     = useState("");
-  const [saving,setSaving]       = useState(false);
-  const [saveErr,setSaveErr]     = useState("");
-  const [selPat,setSelPat]       = useState(null);
-  const [search,setSearch]       = useState("");
-  const [agDate,setAgDate]       = useState(todayStr());
-  const [modal,setModal]         = useState(null);
-  const [nTurno,setNTurno]       = useState({pacienteId:"",fecha:todayStr(),hora:"09:00"});
-  const [nPac,setNPac]           = useState({nombre:"",apellido:"",dni:"",fechaNac:"",tel:"",dir:"",email:""});
-  const [nTx,setNTx]             = useState({pacienteId:"",tipo:"Pago Total",metodo:"Efectivo",monto:"",planId:""});
-  const [repPer,setRepPer]       = useState("diario");
-  const [editPlans,setEditPlans] = useState([]);
-  const [planMsg,setPlanMsg]     = useState("");
+function App(){
+  const [role,setRole]=useState(null);
+  const [tab,setTab]=useState("agenda");
+  const [patients,setPatients]=useState([]);
+  const [turnos,setTurnos]=useState([]);
+  const [txs,setTxs]=useState([]);
+  const [plans,setPlans]=useState([]);
+  const [loading,setLoading]=useState(false);
+  const [loadMsg,setLoadMsg]=useState("");
+  const [saving,setSaving]=useState(false);
+  const [saveErr,setSaveErr]=useState("");
+  const [selPat,setSelPat]=useState(null);
+  const [search,setSearch]=useState("");
+  const [agDate,setAgDate]=useState(todayStr());
+  const [modal,setModal]=useState(null);
+  const [nTurno,setNTurno]=useState({pacienteId:"",fecha:todayStr(),hora:"09:00"});
+  const [editTurno,setEditTurno]=useState(null);
+  const [nPac,setNPac]=useState({nombre:"",apellido:"",dni:"",fechaNac:"",tel:"",dir:"",email:""});
+  const [nTx,setNTx]=useState({pacienteId:"",tipo:"Pago Total",metodo:"Efectivo",monto:"",planId:"",turnoId:""});
+  const [repPer,setRepPer]=useState("diario");
+  const [editPlans,setEditPlans]=useState([]);
+  const [planMsg,setPlanMsg]=useState("");
 
-  const isAdmin = role==="admin";
-  const getPac  = id => patients.find(p=>p.id===id);
-  const nextId  = arr => arr.length>0?Math.max(...arr.map(x=>Number(x.id)))+1:1;
+  const isAdmin=role==="admin";
+  const getPac=id=>patients.find(p=>p.id===id);
+  const nextId=arr=>arr.length>0?Math.max(...arr.map(x=>Number(x.id)))+1:1;
 
-  const loadAll = useCallback(async () => {
-    setLoading(true); setSaveErr("");
-    try {
+  const loadAll=useCallback(async()=>{
+    setLoading(true);setSaveErr("");
+    try{
       setLoadMsg("Cargando planes…");
-      const pl = await sheetsGet("planes");
-      const plP = pl.map(p=>({...p,id:Number(p.id),sessions:Number(p.sessions),price:Number(p.price)}));
-      setPlans(plP); setEditPlans(plP);
+      const pl=await sheetsGet("planes");
+      const plP=pl.map(p=>({...p,id:Number(p.id),sessions:Number(p.sessions),price:Number(p.price)}));
+      setPlans(plP);setEditPlans(plP);
       setLoadMsg("Cargando pacientes…");
-      const pa = await sheetsGet("pacientes");
+      const pa=await sheetsGet("pacientes");
       setPatients(pa.map(p=>({...p,id:Number(p.id),sesiones:Number(p.sesiones||0)})));
       setLoadMsg("Cargando turnos…");
-      const tu = await sheetsGet("turnos");
+      const tu=await sheetsGet("turnos");
       setTurnos(tu.map(t=>({...t,id:Number(t.id),pacienteId:Number(t.pacienteId)})));
       setLoadMsg("Cargando transacciones…");
-      const tx = await sheetsGet("transacciones");
-      setTxs(tx.map(t=>({...t,id:Number(t.id),pacienteId:Number(t.pacienteId),monto:Number(t.monto),planId:t.planId?Number(t.planId):null})));
-    } catch(e) { setSaveErr(e.message||"Error al conectar con Google Sheets."); }
-    finally { setLoading(false); setLoadMsg(""); }
-  }, []);
+      const tx=await sheetsGet("transacciones");
+      setTxs(tx.map(t=>({...t,id:Number(t.id),pacienteId:Number(t.pacienteId),monto:Number(t.monto),planId:t.planId?Number(t.planId):null,turnoId:t.turnoId?Number(t.turnoId):null})));
+    }catch(e){setSaveErr(e.message||"Error al conectar.");}
+    finally{setLoading(false);setLoadMsg("");}
+  },[]);
 
-  useEffect(()=>{ if(role) loadAll(); },[role]);
+  useEffect(()=>{if(role)loadAll();},[role]);
 
-  const save = async (sheet,data) => {
-    setSaving(true); setSaveErr("");
-    try { await sheetsWrite(sheet,data); }
-    catch(e) { setSaveErr("Error al guardar: "+e.message); }
-    finally { setSaving(false); }
-  };
+  const save=async(sheet,data)=>{setSaving(true);setSaveErr("");try{await sheetsWrite(sheet,data);}catch(e){setSaveErr("Error: "+e.message);}finally{setSaving(false);}};
 
-  const pendingBalance = pid => {
-    const paid = txs.filter(t=>t.pacienteId===pid&&t.estado==="Activo").reduce((a,t)=>a+t.monto,0);
-    const owed = txs.filter(t=>t.pacienteId===pid&&t.estado==="Activo"&&t.planId).reduce((a,t)=>{ const pl=plans.find(p=>p.id===t.planId); return a+(pl?pl.price:0); },0);
+  const pendingBalance=pid=>{
+    const paid=txs.filter(t=>t.pacienteId===pid&&t.estado==="Activo").reduce((a,t)=>a+t.monto,0);
+    const owed=txs.filter(t=>t.pacienteId===pid&&t.estado==="Activo"&&t.planId).reduce((a,t)=>{const pl=plans.find(p=>p.id===t.planId);return a+(pl?pl.price:0);},0);
     return Math.max(0,owed-paid);
   };
 
-  const turnosDia = useMemo(()=>turnos.filter(t=>t.fecha===agDate).sort((a,b)=>a.hora.localeCompare(b.hora)),[turnos,agDate]);
-  const turnosSemana = useMemo(()=>{
+  const turnosDia=useMemo(()=>turnos.filter(t=>t.fecha===agDate).sort((a,b)=>a.hora.localeCompare(b.hora)),[turnos,agDate]);
+  const turnosSemana=useMemo(()=>{
     const d=new Date(agDate),dow=d.getDay(),mon=new Date(d);
     mon.setDate(d.getDate()-(dow===0?6:dow-1));
-    return Array.from({length:7},(_,i)=>{ const dd=new Date(mon); dd.setDate(mon.getDate()+i); const date=dd.toISOString().slice(0,10); return {date,ts:turnos.filter(t=>t.fecha===date).sort((a,b)=>a.hora.localeCompare(b.hora))}; });
+    return Array.from({length:7},(_,i)=>{const dd=new Date(mon);dd.setDate(mon.getDate()+i);const date=dd.toISOString().slice(0,10);return{date,ts:turnos.filter(t=>t.fecha===date).sort((a,b)=>a.hora.localeCompare(b.hora))};});
   },[turnos,agDate]);
 
-  const markAsistencia = async (tid,estado) => {
-    let newP=patients;
-    const newT=turnos.map(t=>{ if(t.id!==tid) return t; if(estado==="Asistió") newP=patients.map(p=>p.id===t.pacienteId&&p.sesiones>0?{...p,sesiones:p.sesiones-1}:p); return {...t,estado}; });
-    setTurnos(newT); setPatients(newP);
-    await save("turnos",newT); if(estado==="Asistió") await save("pacientes",newP);
+  const markAsistencia=async(tid,estado)=>{
+    let nP=patients;
+    const nT=turnos.map(t=>{if(t.id!==tid)return t;if(estado==="Asistió")nP=patients.map(p=>p.id===t.pacienteId&&p.sesiones>0?{...p,sesiones:p.sesiones-1}:p);return{...t,estado};});
+    setTurnos(nT);setPatients(nP);await save("turnos",nT);if(estado==="Asistió")await save("pacientes",nP);
   };
-  const addTurno = async () => {
-    if(!nTurno.pacienteId||!nTurno.fecha||!nTurno.hora) return;
-    const newT=[...turnos,{id:nextId(turnos),pacienteId:parseInt(nTurno.pacienteId),fecha:nTurno.fecha,hora:nTurno.hora,estado:"Pendiente"}];
-    setTurnos(newT); setModal(null); await save("turnos",newT);
+  const addTurno=async()=>{
+    if(!nTurno.pacienteId||!nTurno.fecha||!nTurno.hora)return;
+    const nT=[...turnos,{id:nextId(turnos),pacienteId:parseInt(nTurno.pacienteId),fecha:nTurno.fecha,hora:nTurno.hora,estado:"Pendiente"}];
+    setTurnos(nT);setModal(null);await save("turnos",nT);
   };
-  const addPaciente = async () => {
-    if(!nPac.nombre||!nPac.apellido||!nPac.dni) return;
-    const newP=[...patients,{id:nextId(patients),...nPac,seguimiento:"",sesiones:0}];
-    setPatients(newP); setModal(null); setNPac({nombre:"",apellido:"",dni:"",fechaNac:"",tel:"",dir:"",email:""});
-    await save("pacientes",newP);
+  const saveEditTurno=async()=>{
+    if(!editTurno)return;
+    const nT=turnos.map(t=>t.id===editTurno.id?{...t,fecha:editTurno.fecha,hora:editTurno.hora}:t);
+    setTurnos(nT);setModal(null);setEditTurno(null);await save("turnos",nT);
   };
-  const venderPlan = async (pid,planId) => {
-    const pl=plans.find(p=>p.id===planId); if(!pl) return;
-    const newP=patients.map(p=>p.id===pid?{...p,sesiones:p.sesiones+pl.sessions}:p);
-    const newTx=[...txs,{id:nextId(txs),pacienteId:pid,tipo:"Pago Total",metodo:"Efectivo",monto:0,fecha:nowStr(),estado:"Activo",planId}];
-    setPatients(newP); setTxs(newTx); await save("pacientes",newP); await save("transacciones",newTx);
+  const addPaciente=async()=>{
+    if(!nPac.nombre||!nPac.apellido||!nPac.dni)return;
+    const nP=[...patients,{id:nextId(patients),...nPac,seguimiento:"",sesiones:0}];
+    setPatients(nP);setModal(null);setNPac({nombre:"",apellido:"",dni:"",fechaNac:"",tel:"",dir:"",email:""});
+    await save("pacientes",nP);
   };
-  const addTx = async () => {
-    if(!nTx.monto||!nTx.pacienteId) return;
-    const newList=[...txs,{id:nextId(txs),pacienteId:parseInt(nTx.pacienteId),tipo:nTx.tipo,metodo:nTx.metodo,monto:parseFloat(nTx.monto),fecha:nowStr(),estado:"Activo",planId:nTx.planId?parseInt(nTx.planId):null}];
-    setTxs(newList); setNTx({pacienteId:"",tipo:"Pago Total",metodo:"Efectivo",monto:"",planId:""}); await save("transacciones",newList);
+  const venderPlan=async(pid,planId)=>{
+    const pl=plans.find(p=>p.id===planId);if(!pl)return;
+    const nP=patients.map(p=>p.id===pid?{...p,sesiones:p.sesiones+pl.sessions}:p);
+    const nTx=[...txs,{id:nextId(txs),pacienteId:pid,tipo:"Plan vendido",metodo:"—",monto:pl.price,fecha:nowStr(),estado:"Activo",planId,turnoId:null}];
+    setPatients(nP);setTxs(nTx);await save("pacientes",nP);await save("transacciones",nTx);
   };
-  const anularTx = async id => { const n=txs.map(t=>t.id===id?{...t,estado:"Anulado"}:t); setTxs(n); await save("transacciones",n); };
-  const saveSeguimiento = async (pid,text) => { const n=patients.map(p=>p.id===pid?{...p,seguimiento:text}:p); setPatients(n); await save("pacientes",n); };
-  const savePlanes = async () => { setPlans(editPlans); setPlanMsg("Guardando…"); await save("planes",editPlans); setPlanMsg("¡Guardado!"); setTimeout(()=>setPlanMsg(""),3000); };
-  const addPlan    = () => setEditPlans(p=>[...p,{id:nextId(p),name:"Nuevo Plan",sessions:1,price:0}]);
-  const removePlan = id => setEditPlans(p=>p.filter(x=>x.id!==id));
-  const updatePlan = (id,f,v) => setEditPlans(p=>p.map(x=>x.id===id?{...x,[f]:f==="name"?v:Number(v)}:x));
+  const addTx=async()=>{
+    if(!nTx.monto||!nTx.pacienteId)return;
+    const nList=[...txs,{id:nextId(txs),pacienteId:parseInt(nTx.pacienteId),tipo:nTx.tipo,metodo:nTx.metodo,monto:parseFloat(nTx.monto),fecha:nowStr(),estado:"Activo",planId:nTx.planId?parseInt(nTx.planId):null,turnoId:nTx.turnoId?parseInt(nTx.turnoId):null}];
+    setTxs(nList);setNTx({pacienteId:"",tipo:"Pago Total",metodo:"Efectivo",monto:"",planId:"",turnoId:""});
+    await save("transacciones",nList);
+  };
+  const anularTx=async id=>{const n=txs.map(t=>t.id===id?{...t,estado:"Anulado"}:t);setTxs(n);await save("transacciones",n);};
+  const saveSeg=async(pid,text)=>{const n=patients.map(p=>p.id===pid?{...p,seguimiento:text}:p);setPatients(n);await save("pacientes",n);};
+  const savePlanes=async()=>{setPlans(editPlans);setPlanMsg("Guardando…");await save("planes",editPlans);setPlanMsg("¡Guardado!");setTimeout(()=>setPlanMsg(""),3000);};
+  const addPlan=()=>setEditPlans(p=>[...p,{id:nextId(p),name:"Nuevo Plan",sessions:1,price:0}]);
+  const removePlan=id=>setEditPlans(p=>p.filter(x=>x.id!==id));
+  const updatePlan=(id,f,v)=>setEditPlans(p=>p.map(x=>x.id===id?{...x,[f]:f==="name"?v:Number(v)}:x));
 
   const filteredPats=patients.filter(p=>p.dni.includes(search)||p.apellido.toLowerCase().includes(search.toLowerCase())||p.nombre.toLowerCase().includes(search.toLowerCase()));
   const txsHoy=txs.filter(t=>t.fecha.slice(0,10)===todayStr());
   const txsMes=txs.filter(t=>t.fecha.slice(0,7)===todayStr().slice(0,7));
-  const calcRep=list=>{ const a=list.filter(t=>t.estado==="Activo"); return {efectivo:a.filter(t=>t.metodo==="Efectivo").reduce((s,t)=>s+t.monto,0),transfer:a.filter(t=>t.metodo==="Transferencia").reduce((s,t)=>s+t.monto,0),total:a.reduce((s,t)=>s+t.monto,0)}; };
+  const calcRep=list=>{const a=list.filter(t=>t.estado==="Activo");return{efectivo:a.filter(t=>t.metodo==="Efectivo").reduce((s,t)=>s+t.monto,0),transfer:a.filter(t=>t.metodo==="Transferencia").reduce((s,t)=>s+t.monto,0),total:a.reduce((s,t)=>s+t.monto,0)};};
   const rep=calcRep(repPer==="diario"?txsHoy:txsMes);
+  const turnosHoy=turnos.filter(t=>t.fecha===todayStr());
   const tabSt=t=>({padding:"8px 14px",cursor:"pointer",borderRadius:8,fontSize:13,fontWeight:500,display:"flex",alignItems:"center",gap:6,background:tab===t?C.primaryLight:"transparent",color:tab===t?C.primary:"#666",border:"none"});
 
-  if(!role) return <LoginScreen onLogin={r=>{setRole(r);setTab("agenda");}}/>;
-  if(loading) return (
-    <div style={{minHeight:"100vh",background:"#f5f5f5",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
-      <LogoFull/><div style={{display:"flex",alignItems:"center",gap:10,color:C.primary,marginTop:16}}><Spinner size={20} color={C.primary}/><span style={{fontSize:14}}>{loadMsg}</span></div>
-    </div>
-  );
+  if(!role)return <LoginScreen onLogin={r=>{setRole(r);setTab("agenda");}}/>;
+  if(loading)return(<div style={{minHeight:"100vh",background:"#f5f5f5",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}><LogoFull/><div style={{display:"flex",alignItems:"center",gap:10,color:C.primary,marginTop:16}}><Spin size={20} color={C.primary}/><span style={{fontSize:14}}>{loadMsg}</span></div></div>);
 
-  return (
-    <div style={{minHeight:"100vh",background:"#f5f5f5",fontFamily:"var(--font-sans)"}}>
-      {saving&&<div style={{position:"fixed",top:10,right:16,zIndex:100,background:C.primaryLight,color:C.primary,border:`1px solid ${C.primary}`,borderRadius:8,padding:"6px 12px",fontSize:12,display:"flex",alignItems:"center",gap:6}}><Spinner size={12} color={C.primary}/> Guardando…</div>}
-      {saveErr&&<div style={{position:"fixed",top:10,right:16,zIndex:100,background:C.dangerLight,color:C.danger,border:`1px solid ${C.danger}`,borderRadius:8,padding:"6px 12px",fontSize:12,maxWidth:320}}>⚠ {saveErr} <button onClick={()=>setSaveErr("")} style={{marginLeft:8,background:"none",border:"none",cursor:"pointer",color:C.danger,fontWeight:700}}>×</button></div>}
+  return(
+    <div style={{minHeight:"100vh",background:"#f5f5f5"}}>
+      {saving&&<div style={{position:"fixed",top:10,right:16,zIndex:100,background:C.primaryLight,color:C.primary,border:`1px solid ${C.primary}`,borderRadius:8,padding:"6px 12px",fontSize:12,display:"flex",alignItems:"center",gap:6}}><Spin size={12} color={C.primary}/> Guardando…</div>}
+      {saveErr&&<div style={{position:"fixed",top:10,right:16,zIndex:100,background:C.dangerLight,color:C.danger,border:`1px solid ${C.danger}`,borderRadius:8,padding:"6px 12px",fontSize:12,maxWidth:320}}>⚠ {saveErr}<button onClick={()=>setSaveErr("")} style={{marginLeft:8,background:"none",border:"none",cursor:"pointer",color:C.danger,fontWeight:700}}>×</button></div>}
 
       {/* Header */}
       <div style={{background:"#fff",borderBottom:"1px solid #ececec",padding:"0 1.5rem",display:"flex",alignItems:"center",justifyContent:"space-between",height:52}}>
         <LogoFull compact/>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <button onClick={loadAll} style={{background:"none",border:"none",cursor:"pointer",color:"#666",display:"flex",alignItems:"center"}}><IRefresh/></button>
+          <button onClick={loadAll} style={{background:"none",border:"none",cursor:"pointer",color:"#666",display:"flex"}}><Ic.Refresh/></button>
           <div style={{width:28,height:28,borderRadius:"50%",background:isAdmin?"#E6F1FB":C.primaryLight,display:"flex",alignItems:"center",justifyContent:"center"}}>
             <span style={{fontSize:11,fontWeight:500,color:isAdmin?C.info:C.primary}}>{isAdmin?"AD":"SC"}</span>
           </div>
           <span style={{fontSize:12,color:"#666"}}>{isAdmin?"Administrador":"Secretaría"}</span>
-          <Btn small onClick={()=>{setRole(null);setTab("agenda");}} style={{fontSize:11}}>Cerrar sesión</Btn>
+          <Btn small onClick={()=>{setRole(null);setTab("agenda");}}>Cerrar sesión</Btn>
         </div>
       </div>
 
       <div style={{display:"flex",height:"calc(100vh - 52px)"}}>
         {/* Sidebar */}
-        <div style={{width:180,background:"#fff",borderRight:"1px solid #ececec",padding:"1rem 0.75rem",display:"flex",flexDirection:"column",gap:4,flexShrink:0}}>
-          {[{id:"agenda",icon:<ICalendar/>,label:"Agenda"},{id:"pacientes",icon:<IUsers/>,label:"Pacientes"},...(isAdmin?[{id:"caja",icon:<IDollar/>,label:"Caja y finanzas"},{id:"config",icon:<ISettings/>,label:"Configuración"}]:[])].map(t=>(
-            <button key={t.id} style={tabSt(t.id)} onClick={()=>setTab(t.id)}>{t.icon}{t.label}</button>
-          ))}
-          {!isAdmin&&<div style={{marginTop:"auto",padding:"8px",borderRadius:8,background:C.dangerLight,display:"flex",gap:6,alignItems:"flex-start"}}><IShield/><span style={{fontSize:11,color:C.danger,lineHeight:1.4}}>Caja restringida</span></div>}
+        <div style={{width:185,background:"#fff",borderRight:"1px solid #ececec",padding:"1rem 0.75rem",display:"flex",flexDirection:"column",gap:4,flexShrink:0}}>
+          {[
+            {id:"agenda",icon:<Ic.Calendar/>,label:"Agenda"},
+            {id:"pacientes",icon:<Ic.Users/>,label:"Pacientes"},
+            {id:"cobros",icon:<Ic.Dollar/>,label:"Cobros"},
+            ...(isAdmin?[{id:"caja",icon:<Ic.Dollar/>,label:"Caja y finanzas"},{id:"config",icon:<Ic.Settings/>,label:"Configuración"}]:[]),
+          ].map(t=><button key={t.id} style={tabSt(t.id)} onClick={()=>setTab(t.id)}>{t.icon}{t.label}</button>)}
         </div>
 
         <div style={{flex:1,overflowY:"auto",padding:"1.25rem"}}>
 
-          {/* AGENDA */}
+          {/* ── AGENDA ── */}
           {tab==="agenda"&&(
             <div>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
-                <div><h2 style={{margin:0,fontSize:18}}>Agenda</h2><p style={{margin:"2px 0 0",fontSize:13,color:"#666"}}>Gestión de turnos diaria y semanal</p></div>
-                <Btn variant="primary" onClick={()=>setModal("turno")}><IPlus/> Nuevo turno</Btn>
+                <div><h2 style={{margin:0,fontSize:18}}>Agenda</h2><p style={{margin:"2px 0 0",fontSize:13,color:"#666"}}>Turnos diarios y semanales</p></div>
+                <Btn variant="primary" onClick={()=>setModal("turno")}><Ic.Plus/> Nuevo turno</Btn>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem"}}>
                 <Card>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
                     <span style={{fontWeight:500,fontSize:14}}>Vista diaria</span>
-                    <input type="date" value={agDate} onChange={e=>setAgDate(e.target.value)} style={{fontSize:12,padding:"3px 6px"}}/>
+                    <input type="date" value={agDate} onChange={e=>setAgDate(e.target.value)} style={{fontSize:12,padding:"3px 6px",width:"auto"}}/>
                   </div>
                   {turnosDia.length===0&&<p style={{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}}>Sin turnos para este día</p>}
                   <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                    {turnosDia.map(t=>{ const p=getPac(t.pacienteId); return (
-                      <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ececec"}}>
-                        <div style={{width:38,height:38,borderRadius:"50%",background:C.primaryLight,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:500,fontSize:13,color:C.primary,flexShrink:0}}>{p?p.nombre[0]+p.apellido[0]:"?"}</div>
+                    {turnosDia.map(t=>{const p=getPac(t.pacienteId);return(
+                      <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ececec"}}>
+                        <div style={{width:36,height:36,borderRadius:"50%",background:C.primaryLight,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:500,fontSize:12,color:C.primary,flexShrink:0}}>{p?p.nombre[0]+p.apellido[0]:"?"}</div>
                         <div style={{flex:1,minWidth:0}}>
                           <p style={{margin:0,fontSize:13,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p?`${p.nombre} ${p.apellido}`:"—"}</p>
-                          <p style={{margin:0,fontSize:11,color:"#666"}}><IClock/> {t.hora} · <span style={{color:p?.sesiones===0?C.danger:"#666"}}>{p?.sesiones??0} ses.</span></p>
+                          <p style={{margin:0,fontSize:11,color:"#666"}}><Ic.Clock/> {t.hora} · <span style={{color:p?.sesiones===0?C.danger:"#666"}}>{p?.sesiones??0} ses.</span></p>
                         </div>
-                        <Badge color={estadoColor(t.estado)} bg={estadoBg(t.estado)}>{t.estado}</Badge>
-                        {t.estado==="Pendiente"&&<div style={{display:"flex",gap:4}}><Btn small variant="primary" onClick={()=>markAsistencia(t.id,"Asistió")} style={{padding:"3px 8px"}}><ICheck/></Btn><Btn small variant="danger" onClick={()=>markAsistencia(t.id,"Ausente")} style={{padding:"3px 8px"}}><IX/></Btn></div>}
+                        <Badge color={eColor(t.estado)} bg={eBg(t.estado)}>{t.estado}</Badge>
+                        <div style={{display:"flex",gap:3}}>
+                          {t.estado==="Pendiente"&&<><Btn small variant="primary" onClick={()=>markAsistencia(t.id,"Asistió")} style={{padding:"3px 7px"}}><Ic.Check/></Btn><Btn small variant="danger" onClick={()=>markAsistencia(t.id,"Ausente")} style={{padding:"3px 7px"}}><Ic.X/></Btn></>}
+                          <Btn small onClick={()=>{setEditTurno({...t});setModal("editTurno");}} style={{padding:"3px 7px"}} title="Editar turno"><Ic.Edit/></Btn>
+                        </div>
                       </div>
-                    ); })}
+                    );})}
                   </div>
                 </Card>
                 <Card>
@@ -351,7 +331,7 @@ function App() {
                           {new Date(date+"T12:00").toLocaleDateString("es-AR",{weekday:"short",day:"numeric",month:"short"})}
                           {date===todayStr()&&<span style={{marginLeft:6,fontSize:10,background:C.primary,color:"#fff",borderRadius:4,padding:"1px 5px"}}>Hoy</span>}
                         </p>
-                        {ts.length===0?<p style={{margin:0,fontSize:11,color:"#999"}}>Sin turnos</p>:ts.map(t=>{ const pp=getPac(t.pacienteId); return <p key={t.id} style={{margin:"2px 0",fontSize:12}}>{t.hora} — {pp?`${pp.nombre} ${pp.apellido}`:"—"} <Badge color={estadoColor(t.estado)} bg={estadoBg(t.estado)}>{t.estado}</Badge></p>; })}
+                        {ts.length===0?<p style={{margin:0,fontSize:11,color:"#999"}}>Sin turnos</p>:ts.map(t=>{const pp=getPac(t.pacienteId);return<p key={t.id} style={{margin:"2px 0",fontSize:12}}>{t.hora} — {pp?`${pp.nombre} ${pp.apellido}`:"—"} <Badge color={eColor(t.estado)} bg={eBg(t.estado)}>{t.estado}</Badge></p>;})}
                       </div>
                     ))}
                   </div>
@@ -360,53 +340,53 @@ function App() {
             </div>
           )}
 
-          {/* PACIENTES */}
+          {/* ── PACIENTES ── */}
           {tab==="pacientes"&&(
             <div>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
                 <h2 style={{margin:0,fontSize:18}}>Pacientes</h2>
-                <Btn variant="primary" onClick={()=>setModal("paciente")}><IPlus/> Nuevo paciente</Btn>
+                <Btn variant="primary" onClick={()=>setModal("paciente")}><Ic.Plus/> Nuevo paciente</Btn>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"280px 1fr",gap:"1rem"}}>
                 <div>
                   <div style={{position:"relative",marginBottom:10}}>
-                    <span style={{position:"absolute",left:9,top:"50%",transform:"translateY(-50%)",color:"#999"}}><ISearch/></span>
-                    <input placeholder="Buscar por apellido o DNI…" value={search} onChange={e=>setSearch(e.target.value)} style={{paddingLeft:28,width:"100%"}}/>
+                    <span style={{position:"absolute",left:9,top:"50%",transform:"translateY(-50%)",color:"#999"}}><Ic.Search/></span>
+                    <input placeholder="Buscar apellido o DNI…" value={search} onChange={e=>setSearch(e.target.value)} style={{paddingLeft:28}}/>
                   </div>
                   {filteredPats.length===0&&<p style={{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}}>Sin pacientes</p>}
                   <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                    {filteredPats.map(p=>{ const bal=pendingBalance(p.id); return (
+                    {filteredPats.map(p=>{const bal=pendingBalance(p.id);return(
                       <div key={p.id} onClick={()=>setSelPat(p.id)} style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${selPat===p.id?C.primary:"#ececec"}`,background:selPat===p.id?C.primaryLight:"#fff",cursor:"pointer"}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                           <span style={{fontSize:13,fontWeight:500}}>{p.nombre} {p.apellido}</span>
-                          {bal>0&&<span style={{color:C.danger}}><IAlert/></span>}
+                          {bal>0&&<span style={{color:C.danger}}><Ic.Alert/></span>}
                         </div>
-                        <span style={{fontSize:11,color:"#666"}}>DNI {p.dni} · {p.sesiones} sesiones</span>
+                        <span style={{fontSize:11,color:"#666"}}>DNI {p.dni} · {p.sesiones} ses.</span>
                       </div>
-                    ); })}
+                    );})}
                   </div>
                 </div>
-                {selPat?(()=>{ const p=patients.find(pp=>pp.id===selPat); if(!p) return null; const bal=pendingBalance(p.id); return (
+                {selPat?(()=>{const p=patients.find(pp=>pp.id===selPat);if(!p)return null;const bal=pendingBalance(p.id);return(
                   <div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
-                    {bal>0&&<div style={{background:C.dangerLight,border:`1px solid ${C.danger}`,borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}><span style={{color:C.danger,flexShrink:0}}><IAlert/></span><div><span style={{fontSize:13,fontWeight:500,color:C.danger}}>Saldo pendiente: {fmt(bal)}</span><p style={{margin:0,fontSize:11,color:C.danger}}>Tiene un plan sin pago total.</p></div></div>}
+                    {bal>0&&<div style={{background:C.dangerLight,border:`1px solid ${C.danger}`,borderRadius:10,padding:"10px 14px",display:"flex",gap:10}}><Ic.Alert/><div><span style={{fontSize:13,fontWeight:500,color:C.danger}}>Saldo pendiente: {fmt(bal)}</span><p style={{margin:0,fontSize:11,color:C.danger}}>Plan sin pago total.</p></div></div>}
                     <Card>
                       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
                         <div style={{width:44,height:44,borderRadius:"50%",background:C.primaryLight,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:500,fontSize:14,color:C.primary,flexShrink:0}}>{p.nombre[0]}{p.apellido[0]}</div>
-                        <div><p style={{margin:0,fontWeight:500,fontSize:15}}>{p.nombre} {p.apellido}</p><p style={{margin:0,fontSize:12,color:"#666"}}>DNI {p.dni} · Nac. {fmtDate(p.fechaNac)}</p></div>
-                        <div style={{marginLeft:"auto",textAlign:"right"}}><p style={{margin:0,fontSize:11,color:"#666"}}>Sesiones disponibles</p><p style={{margin:0,fontSize:22,fontWeight:500,color:p.sesiones===0?C.danger:C.primary}}>{p.sesiones}</p></div>
+                        <div><p style={{margin:0,fontWeight:500,fontSize:15}}>{p.nombre} {p.apellido}</p><p style={{margin:0,fontSize:12,color:"#666"}}>DNI {p.dni} · {fmtDate(p.fechaNac)}</p></div>
+                        <div style={{marginLeft:"auto",textAlign:"right"}}><p style={{margin:0,fontSize:11,color:"#666"}}>Sesiones</p><p style={{margin:0,fontSize:22,fontWeight:500,color:p.sesiones===0?C.danger:C.primary}}>{p.sesiones}</p></div>
                       </div>
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"4px 12px",fontSize:12,borderTop:"1px solid #ececec",paddingTop:10}}>
-                        {[["Teléfono",p.tel],["Email",p.email],["Dirección",p.dir]].map(([k,v])=><div key={k}><span style={{color:"#666"}}>{k}: </span>{v||"—"}</div>)}
+                        {[["Tel",p.tel],["Email",p.email],["Dir",p.dir]].map(([k,v])=><div key={k}><span style={{color:"#666"}}>{k}: </span>{v||"—"}</div>)}
                       </div>
                     </Card>
                     <Card>
                       <p style={{margin:"0 0 10px",fontWeight:500,fontSize:14}}>Vender plan</p>
-                      {plans.length===0?<div style={{background:C.warnLight,border:`1px solid ${C.warn}`,borderRadius:8,padding:"10px 12px",fontSize:13,color:C.warn}}>{isAdmin?"Andá a Configuración para agregar planes.":"Pedile al administrador que configure los planes."}</div>:(
+                      {plans.length===0?<p style={{fontSize:13,color:C.warn}}>{isAdmin?"Configurá planes primero.":"Pedile al admin que configure los planes."}</p>:(
                         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                           {plans.map(pl=>(
-                            <div key={pl.id} style={{flex:1,minWidth:140,border:"1px solid #ececec",borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
+                            <div key={pl.id} style={{flex:1,minWidth:130,border:"1px solid #ececec",borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
                               <p style={{margin:"0 0 2px",fontSize:13,fontWeight:500}}>{pl.name}</p>
-                              <p style={{margin:"0 0 6px",fontSize:11,color:"#666"}}>{pl.sessions} sesiones</p>
+                              <p style={{margin:"0 0 4px",fontSize:11,color:"#666"}}>{pl.sessions} sesiones</p>
                               <p style={{margin:"0 0 8px",fontSize:14,fontWeight:500,color:C.primary}}>{fmt(pl.price)}</p>
                               <Btn small variant="primary" onClick={()=>venderPlan(p.id,pl.id)} style={{width:"100%",justifyContent:"center"}}>Vender</Btn>
                             </div>
@@ -416,16 +396,70 @@ function App() {
                     </Card>
                     <Card>
                       <p style={{margin:"0 0 8px",fontWeight:500,fontSize:14}}>Seguimiento clínico</p>
-                      <textarea value={p.seguimiento||""} onChange={e=>setPatients(prev=>prev.map(pp=>pp.id===p.id?{...pp,seguimiento:e.target.value}:pp))} onBlur={e=>saveSeguimiento(p.id,e.target.value)} rows={8} placeholder="Encuestas, evolución, notas de sesiones…" style={{width:"100%",resize:"vertical",fontSize:13}}/>
+                      <textarea value={p.seguimiento||""} onChange={e=>setPatients(prev=>prev.map(pp=>pp.id===p.id?{...pp,seguimiento:e.target.value}:pp))} onBlur={e=>saveSeg(p.id,e.target.value)} rows={7} placeholder="Evolución, encuestas, notas…" style={{resize:"vertical",fontSize:13}}/>
                       <p style={{margin:"4px 0 0",fontSize:11,color:"#999"}}>Se guarda al salir del campo.</p>
                     </Card>
                   </div>
-                ); })():<Card style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:200,color:"#999"}}><span style={{marginBottom:8,opacity:0.3,fontSize:32}}>👤</span><p style={{margin:0,fontSize:13}}>Seleccioná un paciente</p></Card>}
+                );})()):(<Card style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:200,color:"#999"}}><p style={{margin:0,fontSize:13}}>Seleccioná un paciente</p></Card>)}
               </div>
             </div>
           )}
 
-          {/* CAJA */}
+          {/* ── COBROS ── */}
+          {tab==="cobros"&&(
+            <div>
+              <div style={{marginBottom:"1rem"}}>
+                <h2 style={{margin:0,fontSize:18}}>Cobros</h2>
+                <p style={{margin:"2px 0 0",fontSize:13,color:"#666"}}>Registrá señas, pagos totales o parciales</p>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem"}}>
+                <Card>
+                  <p style={{margin:"0 0 12px",fontWeight:500,fontSize:14}}>Nuevo cobro</p>
+                  <Sel label="Paciente" value={nTx.pacienteId} onChange={e=>setNTx(p=>({...p,pacienteId:e.target.value,turnoId:""}))}>
+                    <option value="">Seleccionar paciente…</option>
+                    {patients.map(p=><option key={p.id} value={p.id}>{p.nombre} {p.apellido}</option>)}
+                  </Sel>
+                  <Sel label="Tipo de cobro" value={nTx.tipo} onChange={e=>setNTx(p=>({...p,tipo:e.target.value}))}>
+                    <option>Pago Total</option>
+                    <option>Seña</option>
+                    <option>Pago Parcial</option>
+                  </Sel>
+                  <Sel label="Método de pago" value={nTx.metodo} onChange={e=>setNTx(p=>({...p,metodo:e.target.value}))}>
+                    <option>Efectivo</option>
+                    <option>Transferencia</option>
+                  </Sel>
+                  <Sel label="Asociar a turno de hoy (opcional)" value={nTx.turnoId} onChange={e=>setNTx(p=>({...p,turnoId:e.target.value}))}>
+                    <option value="">Sin turno específico</option>
+                    {turnosHoy.filter(t=>!nTx.pacienteId||t.pacienteId===parseInt(nTx.pacienteId)).map(t=>{const pp=getPac(t.pacienteId);return<option key={t.id} value={t.id}>{t.hora} — {pp?`${pp.nombre} ${pp.apellido}`:"?"} ({t.estado})</option>;})}
+                  </Sel>
+                  <Sel label="Plan asociado (opcional)" value={nTx.planId} onChange={e=>setNTx(p=>({...p,planId:e.target.value}))}>
+                    <option value="">Sin plan</option>
+                    {plans.map(pl=><option key={pl.id} value={pl.id}>{pl.name} — {fmt(pl.price)}</option>)}
+                  </Sel>
+                  <Inp label="Monto ($)" type="number" placeholder="0" value={nTx.monto} onChange={e=>setNTx(p=>({...p,monto:e.target.value}))}/>
+                  <Btn variant="primary" onClick={addTx} disabled={!nTx.pacienteId||!nTx.monto} style={{width:"100%",justifyContent:"center",marginTop:4}}><Ic.Plus/> Registrar cobro</Btn>
+                </Card>
+                <Card>
+                  <p style={{margin:"0 0 12px",fontWeight:500,fontSize:14}}>Cobros del día</p>
+                  {txsHoy.filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido").length===0&&<p style={{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}}>Sin cobros registrados hoy</p>}
+                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {txsHoy.filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido").map(t=>{const pp=getPac(t.pacienteId);return(
+                      <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ececec"}}>
+                        <div style={{flex:1}}>
+                          <p style={{margin:0,fontSize:13,fontWeight:500}}>{pp?`${pp.nombre} ${pp.apellido}`:"—"}</p>
+                          <p style={{margin:0,fontSize:11,color:"#666"}}>{t.tipo} · {t.fecha.slice(11,16)}</p>
+                        </div>
+                        <span style={{fontWeight:500,color:C.primary,fontSize:14}}>{fmt(t.monto)}</span>
+                        <Badge color={t.metodo==="Efectivo"?C.warn:C.info} bg={t.metodo==="Efectivo"?C.warnLight:C.infoLight}>{t.metodo}</Badge>
+                      </div>
+                    );})}
+                  </div>
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {/* ── CAJA ADMIN ── */}
           {tab==="caja"&&isAdmin&&(
             <div>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
@@ -434,74 +468,57 @@ function App() {
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem",marginBottom:"1rem"}}>
                 <Card>
-                  <p style={{margin:"0 0 12px",fontWeight:500,fontSize:14}}>Registrar cobro</p>
-                  <Sel label="Paciente" value={nTx.pacienteId} onChange={e=>setNTx(p=>({...p,pacienteId:e.target.value}))}><option value="">Seleccionar…</option>{patients.map(p=><option key={p.id} value={p.id}>{p.nombre} {p.apellido}</option>)}</Sel>
-                  <Sel label="Tipo" value={nTx.tipo} onChange={e=>setNTx(p=>({...p,tipo:e.target.value}))}><option>Pago Total</option><option>Seña</option></Sel>
-                  <Sel label="Método" value={nTx.metodo} onChange={e=>setNTx(p=>({...p,metodo:e.target.value}))}><option>Efectivo</option><option>Transferencia</option></Sel>
-                  <Sel label="Plan asociado (opcional)" value={nTx.planId} onChange={e=>setNTx(p=>({...p,planId:e.target.value}))}><option value="">Sin plan</option>{plans.map(pl=><option key={pl.id} value={pl.id}>{pl.name} — {fmt(pl.price)}</option>)}</Sel>
-                  <Input label="Monto ($)" type="number" placeholder="0" value={nTx.monto} onChange={e=>setNTx(p=>({...p,monto:e.target.value}))}/>
-                  <Btn variant="primary" onClick={addTx} style={{width:"100%",justifyContent:"center"}}><IPlus/> Registrar</Btn>
-                </Card>
-                <Card>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-                    <p style={{margin:0,fontWeight:500,fontSize:14}}>Reporte financiero</p>
-                    <div style={{display:"flex",gap:4}}>{["diario","mensual"].map(v=><Btn key={v} small variant={repPer===v?"primary":"default"} onClick={()=>setRepPer(v)}>{v==="diario"?"Hoy":"Este mes"}</Btn>)}</div>
+                    <p style={{margin:0,fontWeight:500,fontSize:14}}>Reporte</p>
+                    <div style={{display:"flex",gap:4}}>{["diario","mensual"].map(v=><Btn key={v} small variant={repPer===v?"primary":"default"} onClick={()=>setRepPer(v)}>{v==="diario"?"Hoy":"Mes"}</Btn>)}</div>
                   </div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
-                    {[["Total",rep.total,C.primary,C.primaryLight],["Efectivo",rep.efectivo,C.warn,C.warnLight],["Transf.",rep.transfer,C.info,C.infoLight]].map(([label,val,color,bg])=>(
-                      <div key={label} style={{background:bg,borderRadius:8,padding:"10px 12px",textAlign:"center"}}><p style={{margin:"0 0 2px",fontSize:11,color}}>{label}</p><p style={{margin:0,fontSize:15,fontWeight:500,color}}>{fmt(val)}</p></div>
+                    {[["Total",rep.total,C.primary,C.primaryLight],["Efectivo",rep.efectivo,C.warn,C.warnLight],["Transf.",rep.transfer,C.info,C.infoLight]].map(([l,v,color,bg])=>(
+                      <div key={l} style={{background:bg,borderRadius:8,padding:"10px 12px",textAlign:"center"}}><p style={{margin:"0 0 2px",fontSize:11,color}}>{l}</p><p style={{margin:0,fontSize:14,fontWeight:500,color}}>{fmt(v)}</p></div>
                     ))}
                   </div>
                   <div style={{borderTop:"1px solid #ececec",paddingTop:10}}>
-                    <p style={{margin:"0 0 6px",fontSize:12,fontWeight:500,color:"#666"}}>Flujo neto</p>
-                    {(repPer==="diario"?txsHoy:txsMes).filter(t=>t.estado==="Activo").map(t=>{ const pp=getPac(t.pacienteId); return (<div key={t.id} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"3px 0",borderBottom:"1px solid #ececec"}}><span>{pp?`${pp.nombre} ${pp.apellido}`:"—"} · {t.tipo}</span><span style={{color:C.primary,fontWeight:500}}>{fmt(t.monto)}</span></div>); })}
+                    {(repPer==="diario"?txsHoy:txsMes).filter(t=>t.estado==="Activo").map(t=>{const pp=getPac(t.pacienteId);return(<div key={t.id} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"3px 0",borderBottom:"1px solid #ececec"}}><span>{pp?`${pp.nombre} ${pp.apellido}`:"—"} · {t.tipo}</span><span style={{color:C.primary,fontWeight:500}}>{fmt(t.monto)}</span></div>);})}
+                  </div>
+                </Card>
+                <Card>
+                  <p style={{margin:"0 0 12px",fontWeight:500,fontSize:14}}>Transacciones del día</p>
+                  {txsHoy.length===0&&<p style={{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}}>Sin transacciones</p>}
+                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {txsHoy.map(t=>{const pp=getPac(t.pacienteId);return(
+                      <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:t.estado==="Anulado"?"#f8f8f8":"#fff",border:"1px solid #ececec",opacity:t.estado==="Anulado"?.5:1}}>
+                        <div style={{flex:1}}><p style={{margin:0,fontSize:13,fontWeight:500,textDecoration:t.estado==="Anulado"?"line-through":"none"}}>{pp?`${pp.nombre} ${pp.apellido}`:"—"}</p><p style={{margin:0,fontSize:11,color:"#666"}}>{t.tipo} · {t.metodo} · {t.fecha.slice(11,16)}</p></div>
+                        <span style={{fontWeight:500,color:t.estado==="Anulado"?"#999":C.primary}}>{fmt(t.monto)}</span>
+                        <Badge color={t.estado==="Activo"?C.primary:C.danger} bg={t.estado==="Activo"?C.primaryLight:C.dangerLight}>{t.estado}</Badge>
+                        {t.estado==="Activo"&&isAdmin&&<Btn small variant="danger" onClick={()=>anularTx(t.id)}><Ic.Trash/> Anular</Btn>}
+                      </div>
+                    );})}
                   </div>
                 </Card>
               </div>
-              <Card>
-                <p style={{margin:"0 0 12px",fontWeight:500,fontSize:14}}>Transacciones del día</p>
-                {txsHoy.length===0&&<p style={{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}}>Sin transacciones hoy</p>}
-                <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                  {txsHoy.map(t=>{ const pp=getPac(t.pacienteId); return (
-                    <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:8,background:t.estado==="Anulado"?"#f8f8f8":"#fff",border:"1px solid #ececec",opacity:t.estado==="Anulado"?0.5:1}}>
-                      <div style={{flex:1}}><p style={{margin:0,fontSize:13,fontWeight:500,textDecoration:t.estado==="Anulado"?"line-through":"none"}}>{pp?`${pp.nombre} ${pp.apellido}`:"—"}</p><p style={{margin:0,fontSize:11,color:"#666"}}>{t.tipo} · {t.metodo} · {t.fecha.replace("T"," ")}</p></div>
-                      <span style={{fontWeight:500,color:t.estado==="Anulado"?"#999":C.primary}}>{fmt(t.monto)}</span>
-                      <Badge color={t.estado==="Activo"?C.primary:C.danger} bg={t.estado==="Activo"?C.primaryLight:C.dangerLight}>{t.estado}</Badge>
-                      {t.estado==="Activo"&&<Btn small variant="danger" onClick={()=>anularTx(t.id)}><ITrash/> Anular</Btn>}
-                    </div>
-                  ); })}
-                </div>
-              </Card>
-            </div>
-          )}
-          {tab==="caja"&&!isAdmin&&(
-            <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:300,gap:12}}>
-              <div style={{width:56,height:56,borderRadius:"50%",background:C.dangerLight,display:"flex",alignItems:"center",justifyContent:"center"}}><IEyeOff/></div>
-              <p style={{margin:0,fontSize:16,fontWeight:500}}>Acceso restringido</p>
-              <p style={{margin:0,fontSize:13,color:"#666",textAlign:"center"}}>Solo disponible para el Administrador.</p>
             </div>
           )}
 
-          {/* CONFIGURACIÓN */}
+          {/* ── CONFIGURACIÓN ── */}
           {tab==="config"&&isAdmin&&(
             <div>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
-                <div><h2 style={{margin:0,fontSize:18}}>Configuración de planes</h2><p style={{margin:"2px 0 0",fontSize:13,color:"#666"}}>Se guarda en Google Sheets</p></div>
+                <div><h2 style={{margin:0,fontSize:18}}>Planes</h2><p style={{margin:"2px 0 0",fontSize:13,color:"#666"}}>Se guarda en Google Sheets</p></div>
                 <div style={{display:"flex",gap:8,alignItems:"center"}}>
                   {planMsg&&<span style={{fontSize:12,color:C.primary}}>{planMsg}</span>}
-                  <Btn onClick={addPlan}><IPlus/> Agregar plan</Btn>
-                  <Btn variant="primary" onClick={savePlanes}><ISave/> Guardar cambios</Btn>
+                  <Btn onClick={addPlan}><Ic.Plus/> Agregar</Btn>
+                  <Btn variant="primary" onClick={savePlanes}><Ic.Save/> Guardar</Btn>
                 </div>
               </div>
               <Card>
+                {editPlans.length===0&&<p style={{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}}>No hay planes.</p>}
                 <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                  {editPlans.length===0&&<p style={{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}}>No hay planes. Agregá uno.</p>}
                   {editPlans.map(pl=>(
-                    <div key={pl.id} style={{display:"grid",gridTemplateColumns:"1fr 120px 160px 40px",gap:10,alignItems:"center",padding:"10px 12px",borderRadius:10,border:"1px solid #ececec",background:"#f8f8f8"}}>
-                      <div><label style={{fontSize:11,color:"#666",display:"block",marginBottom:3}}>Nombre</label><input value={pl.name} onChange={e=>updatePlan(pl.id,"name",e.target.value)} style={{width:"100%",fontWeight:500}}/></div>
-                      <div><label style={{fontSize:11,color:"#666",display:"block",marginBottom:3}}>Sesiones</label><input type="number" min="1" value={pl.sessions} onChange={e=>updatePlan(pl.id,"sessions",e.target.value)} style={{width:"100%"}}/></div>
-                      <div><label style={{fontSize:11,color:"#666",display:"block",marginBottom:3}}>Precio ($)</label><input type="number" min="0" value={pl.price} onChange={e=>updatePlan(pl.id,"price",e.target.value)} style={{width:"100%"}}/></div>
-                      <Btn small variant="danger" onClick={()=>removePlan(pl.id)} style={{alignSelf:"flex-end",marginBottom:1}}><ITrash/></Btn>
+                    <div key={pl.id} style={{display:"grid",gridTemplateColumns:"1fr 110px 150px 36px",gap:10,alignItems:"center",padding:"10px 12px",borderRadius:10,border:"1px solid #ececec",background:"#f8f8f8"}}>
+                      <div><label style={{fontSize:11,color:"#666",display:"block",marginBottom:3}}>Nombre</label><input value={pl.name} onChange={e=>updatePlan(pl.id,"name",e.target.value)} style={{fontWeight:500}}/></div>
+                      <div><label style={{fontSize:11,color:"#666",display:"block",marginBottom:3}}>Sesiones</label><input type="number" min="1" value={pl.sessions} onChange={e=>updatePlan(pl.id,"sessions",e.target.value)}/></div>
+                      <div><label style={{fontSize:11,color:"#666",display:"block",marginBottom:3}}>Precio ($)</label><input type="number" min="0" value={pl.price} onChange={e=>updatePlan(pl.id,"price",e.target.value)}/></div>
+                      <Btn small variant="danger" onClick={()=>removePlan(pl.id)} style={{alignSelf:"flex-end",marginBottom:1}}><Ic.Trash/></Btn>
                     </div>
                   ))}
                 </div>
@@ -509,7 +526,7 @@ function App() {
                   <div style={{marginTop:14,padding:"10px 12px",borderRadius:10,background:C.primaryLight,border:`1px solid ${C.primary}`}}>
                     <p style={{margin:"0 0 8px",fontSize:12,color:C.primary,fontWeight:500}}>Vista previa</p>
                     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                      {editPlans.map(pl=><div key={pl.id} style={{background:"#fff",borderRadius:8,padding:"8px 12px",fontSize:12,border:"1px solid #ececec"}}><span style={{fontWeight:500}}>{pl.name}</span> · {pl.sessions} ses. · <span style={{color:C.primary,fontWeight:500}}>{fmt(pl.price)}</span></div>)}
+                      {editPlans.map(pl=><div key={pl.id} style={{background:"#fff",borderRadius:8,padding:"8px 12px",fontSize:12,border:"1px solid #ececec"}}><b>{pl.name}</b> · {pl.sessions} ses. · <span style={{color:C.primary,fontWeight:500}}>{fmt(pl.price)}</span></div>)}
                     </div>
                   </div>
                 )}
@@ -519,29 +536,39 @@ function App() {
         </div>
       </div>
 
-      {/* Modal turno */}
+      {/* Modal nuevo turno */}
       {modal==="turno"&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50}}>
           <div style={{background:"#fff",borderRadius:14,padding:"1.5rem",width:360,border:"1px solid #ececec"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}><p style={{margin:0,fontWeight:500,fontSize:16}}>Agendar turno</p><Btn variant="ghost" small onClick={()=>setModal(null)}><IX/></Btn></div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}><p style={{margin:0,fontWeight:500,fontSize:16}}>Agendar turno</p><Btn variant="ghost" small onClick={()=>setModal(null)}><Ic.X/></Btn></div>
             <Sel label="Paciente" value={nTurno.pacienteId} onChange={e=>setNTurno(p=>({...p,pacienteId:e.target.value}))}><option value="">Seleccionar…</option>{patients.map(p=><option key={p.id} value={p.id}>{p.nombre} {p.apellido}</option>)}</Sel>
-            <Input label="Fecha" type="date" value={nTurno.fecha} onChange={e=>setNTurno(p=>({...p,fecha:e.target.value}))}/>
-            <Sel label="Hora (bloques de 20 min)" value={nTurno.hora} onChange={e=>setNTurno(p=>({...p,hora:e.target.value}))}>
-              {Array.from({length:28},(_,i)=>{ const h=Math.floor(i*20/60+8),m=(i*20)%60,s=String(h).padStart(2,"0")+":"+String(m).padStart(2,"0"); return <option key={s} value={s}>{s}</option>; })}
-            </Sel>
-            <p style={{fontSize:11,color:"#999",marginBottom:14}}>Se permiten solapamientos de horario.</p>
-            <div style={{display:"flex",gap:8}}><Btn onClick={()=>setModal(null)} style={{flex:1,justifyContent:"center"}}>Cancelar</Btn><Btn variant="primary" onClick={addTurno} style={{flex:1,justifyContent:"center"}}>Confirmar</Btn></div>
+            <Inp label="Fecha" type="date" value={nTurno.fecha} onChange={e=>setNTurno(p=>({...p,fecha:e.target.value}))}/>
+            <Sel label="Hora" value={nTurno.hora} onChange={e=>setNTurno(p=>({...p,hora:e.target.value}))}>{HORAS.map(h=><option key={h} value={h}>{h}</option>)}</Sel>
+            <div style={{display:"flex",gap:8,marginTop:8}}><Btn onClick={()=>setModal(null)} style={{flex:1,justifyContent:"center"}}>Cancelar</Btn><Btn variant="primary" onClick={addTurno} style={{flex:1,justifyContent:"center"}}>Confirmar</Btn></div>
           </div>
         </div>
       )}
 
-      {/* Modal paciente */}
+      {/* Modal editar turno */}
+      {modal==="editTurno"&&editTurno&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50}}>
+          <div style={{background:"#fff",borderRadius:14,padding:"1.5rem",width:360,border:"1px solid #ececec"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}><p style={{margin:0,fontWeight:500,fontSize:16}}>Editar turno</p><Btn variant="ghost" small onClick={()=>{setModal(null);setEditTurno(null);}}><Ic.X/></Btn></div>
+            <div style={{marginBottom:12,padding:"8px 12px",borderRadius:8,background:C.primaryLight,fontSize:13,fontWeight:500}}>{getPac(editTurno.pacienteId)?.nombre} {getPac(editTurno.pacienteId)?.apellido}</div>
+            <Inp label="Nueva fecha" type="date" value={editTurno.fecha} onChange={e=>setEditTurno(t=>({...t,fecha:e.target.value}))}/>
+            <Sel label="Nueva hora" value={editTurno.hora} onChange={e=>setEditTurno(t=>({...t,hora:e.target.value}))}>{HORAS.map(h=><option key={h} value={h}>{h}</option>)}</Sel>
+            <div style={{display:"flex",gap:8,marginTop:8}}><Btn onClick={()=>{setModal(null);setEditTurno(null);}} style={{flex:1,justifyContent:"center"}}>Cancelar</Btn><Btn variant="primary" onClick={saveEditTurno} style={{flex:1,justifyContent:"center"}}>Guardar</Btn></div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal nuevo paciente */}
       {modal==="paciente"&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50}}>
           <div style={{background:"#fff",borderRadius:14,padding:"1.5rem",width:400,border:"1px solid #ececec",maxHeight:"90vh",overflowY:"auto"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}><p style={{margin:0,fontWeight:500,fontSize:16}}>Nuevo paciente</p><Btn variant="ghost" small onClick={()=>setModal(null)}><IX/></Btn></div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}><p style={{margin:0,fontWeight:500,fontSize:16}}>Nuevo paciente</p><Btn variant="ghost" small onClick={()=>setModal(null)}><Ic.X/></Btn></div>
             {[["nombre","Nombre","text"],["apellido","Apellido","text"],["dni","DNI","text"],["fechaNac","Fecha de nacimiento","date"],["tel","Teléfono","tel"],["email","Email","email"],["dir","Dirección","text"]].map(([k,l,t])=>(
-              <Input key={k} label={l} type={t} value={nPac[k]} onChange={e=>setNPac(p=>({...p,[k]:e.target.value}))}/>
+              <Inp key={k} label={l} type={t} value={nPac[k]} onChange={e=>setNPac(p=>({...p,[k]:e.target.value}))}/>
             ))}
             <div style={{display:"flex",gap:8,marginTop:8}}><Btn onClick={()=>setModal(null)} style={{flex:1,justifyContent:"center"}}>Cancelar</Btn><Btn variant="primary" onClick={addPaciente} style={{flex:1,justifyContent:"center"}}>Registrar</Btn></div>
           </div>
