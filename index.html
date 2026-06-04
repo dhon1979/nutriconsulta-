@@ -386,8 +386,8 @@ function App(){
               h("div",{style:{display:"flex",flexDirection:"column",gap:8}},
                                   turnosDia.map(t=>{
                   const pac=byId(patients,t.pacienteId);
-                  const pagado=txs.some(tx=>tx.turnoId===t.id&&tx.estado==="Activo"&&tx.tipo!=="Plan vendido");
-                  return h("div",{key:t.id,style:{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ececec"}},
+                  const pagado=txs.some(tx=>tx.estado==="Activo"&&tx.tipo!=="Plan vendido"&&(tx.turnoId===t.id||(tx.pacienteId===t.pacienteId&&dateOf(tx.fecha)===t.fecha)));
+                  return h("div",{key:t.id,style:{display:"flex",alignItems:"center",gap:6,padding:"8px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ececec"}},
                     h("div",{style:{width:36,height:36,borderRadius:"50%",background:C.pL,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:500,fontSize:12,color:C.primary,flexShrink:0}},pac?(pac.nombre[0]+pac.apellido[0]):"?"),
                     h("div",{style:{flex:1,minWidth:0}},
                       h("p",{style:{margin:0,fontSize:13,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}},pac?(pac.nombre+" "+pac.apellido):"—"),
