@@ -20,22 +20,23 @@ button{font-family:inherit;font-size:13px;outline:none;cursor:pointer}
 <div id="root"></div>
 <script>
 const {createElement:h,useState,useEffect,useCallback,useMemo}=React;
+
 const SCRIPT_URL="https://script.google.com/macros/s/AKfycbyR2_dqgSMmAbfHfFqWYyb_RZGRjFoq_lp4GFtl3pZqP1WTZf8IcU5MJAxXzks2B7fe/exec";
 const PINS={secretaria:"1234",admin:"9999"};
 const C={primary:"#1D9E75",pL:"#E1F5EE",danger:"#E24B4A",dL:"#FCEBEB",warn:"#BA7517",wL:"#FAEEDA",info:"#378ADD",iL:"#E6F1FB"};
-const HORAS=Array.from({length:28},(_,i)=>{const h2=Math.floor(i*20/60+8),m=(i*20)%60;return String(h2).padStart(2,"0")+":"+String(m).padStart(2,"0");});
+const HORAS=Array.from({length:28},(_,i)=>{const hh=Math.floor(i*20/60+8),m=(i*20)%60;return String(hh).padStart(2,"0")+":"+String(m).padStart(2,"0");});
 const fmt=n=>new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}).format(n);
 const fmtD=d=>{try{return new Date(d).toLocaleDateString("es-AR")}catch{return d}};
 const today=()=>new Date().toISOString().slice(0,10);
 const now=()=>{const d=new Date();return d.toISOString().slice(0,10)+"T"+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");};
-const normEstado=e=>{if(!e)return"Pendiente";const s=e.trim();if(s.toLowerCase().includes("asisti"))return"Asistió";if(s.toLowerCase().includes("ausen"))return"Ausente";return"Pendiente";};
-const eCol=e=>{const n=normEstado(e);return n==="Asistió"?C.primary:n==="Ausente"?C.danger:C.warn;};
-const eBg=e=>{const n=normEstado(e);return n==="Asistió"?C.pL:n==="Ausente"?C.dL:C.wL;};
 
 function normFecha(v){if(!v)return"";const s=String(v).trim();if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);try{const d=new Date(s);if(!isNaN(d))return d.toISOString().slice(0,10);}catch{}return s;}
 function normHora(v){if(!v)return"";const s=String(v).trim();if(/^\d{2}:\d{2}/.test(s))return s.slice(0,5);try{const d=new Date(s);if(!isNaN(d))return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}catch{}return s;}
 function normDT(v){if(!v)return"";const s=String(v).trim();if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s))return s.slice(0,16);if(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(s))return s.slice(0,10)+"T"+s.slice(11,16);try{const d=new Date(s);if(!isNaN(d))return d.toISOString().slice(0,16);}catch{}return s;}
 function dateOf(v){if(!v)return"";const s=String(v).trim();if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);try{const d=new Date(s);if(!isNaN(d))return d.toISOString().slice(0,10);}catch{}return s;}
+function normEstado(e){if(!e)return"Pendiente";const s=String(e).trim().toLowerCase();if(s.includes("asisti"))return"Asistió";if(s.includes("ausen"))return"Ausente";return"Pendiente";}
+const eCol=e=>{const n=normEstado(e);return n==="Asistió"?C.primary:n==="Ausente"?C.danger:C.warn;};
+const eBg=e=>{const n=normEstado(e);return n==="Asistió"?C.pL:n==="Ausente"?C.dL:C.wL;};
 
 function sheetsGet(sheet){
   return new Promise((res,rej)=>{
@@ -60,9 +61,13 @@ function sheetsWrite(sheet,rows){
   });
 }
 
-// UI
-function Badge({color,bg,text}){return h("span",{style:{background:bg,color,fontSize:11,fontWeight:500,padding:"2px 8px",borderRadius:99,whiteSpace:"nowrap",display:"inline-block"}},text);}
-function Card({children,style}){return h("div",{style:{background:"#fff",border:"1px solid #ececec",borderRadius:12,padding:"1rem 1.25rem",...style}},children);}
+// ── UI helpers ────────────────────────────────────────────────────────────────
+function Badge({color,bg,text}){
+  return h("span",{style:{background:bg,color,fontSize:11,fontWeight:500,padding:"2px 8px",borderRadius:99,whiteSpace:"nowrap",display:"inline-block"}},text);
+}
+function Card({children,style}){
+  return h("div",{style:{background:"#fff",border:"1px solid #ececec",borderRadius:12,padding:"1rem 1.25rem",...style}},children);
+}
 function Btn({onClick,children,variant,small,style,disabled}){
   const v=variant||"default";
   const base={border:"1px solid #ddd",borderRadius:8,padding:small?"4px 10px":"7px 14px",fontSize:small?12:13,fontWeight:500,display:"inline-flex",alignItems:"center",gap:5,opacity:disabled?.5:1,cursor:disabled?"not-allowed":"pointer",...style};
@@ -105,20 +110,28 @@ function LogoFull({compact}){
   );
 }
 
-// PIN
+// ── PIN ───────────────────────────────────────────────────────────────────────
 function PinModal({role,onSuccess,onCancel}){
   const [pin,setPin]=useState("");
   const [err,setErr]=useState(false);
   useEffect(()=>{
-    function fn(e){if(e.key>="0"&&e.key<="9")hk(e.key);else if(e.key==="Backspace")hk("X");else if(e.key==="Escape")onCancel();}
-    window.addEventListener("keydown",fn);return()=>window.removeEventListener("keydown",fn);
+    function fn(e){
+      if(e.key>="0"&&e.key<="9")hk(e.key);
+      else if(e.key==="Backspace")hk("DEL");
+      else if(e.key==="Escape")onCancel();
+    }
+    window.addEventListener("keydown",fn);
+    return()=>window.removeEventListener("keydown",fn);
   });
   function hk(k){
     if(k==="")return;
-    if(k==="X"||k==="⌫"){setPin(p=>p.slice(0,-1));setErr(false);return;}
+    if(k==="DEL"||k==="⌫"){setPin(p=>p.slice(0,-1));setErr(false);return;}
     if(pin.length>=4)return;
     const np=pin+String(k);setPin(np);setErr(false);
-    if(np.length===4){if(np===PINS[role])onSuccess();else{setErr(true);setTimeout(()=>{setPin("");setErr(false);},700);}}
+    if(np.length===4){
+      if(np===PINS[role])onSuccess();
+      else{setErr(true);setTimeout(()=>{setPin("");setErr(false);},700);}
+    }
   }
   return h("div",{style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50}},
     h("div",{style:{background:"#fff",borderRadius:14,padding:"1.5rem",width:300,textAlign:"center",border:"1px solid #ececec"}},
@@ -129,7 +142,9 @@ function PinModal({role,onSuccess,onCancel}){
       ),
       err&&h("p",{style:{margin:"0 0 8px",fontSize:12,color:C.danger}},"PIN incorrecto."),
       h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}},
-        [1,2,3,4,5,6,7,8,9,"",0,"⌫"].map((k,i)=>h("button",{key:i,onClick:()=>hk(String(k)),style:{padding:"12px 0",borderRadius:8,border:"1px solid #ececec",background:k===""?"transparent":"#f8f8f8",cursor:k===""?"default":"pointer",fontSize:16,fontWeight:500,opacity:k===""?0:1}},k))
+        [1,2,3,4,5,6,7,8,9,"",0,"⌫"].map((k,i)=>
+          h("button",{key:i,onClick:()=>hk(k==="⌫"?"DEL":String(k)),style:{padding:"12px 0",borderRadius:8,border:"1px solid #ececec",background:k===""?"transparent":"#f8f8f8",cursor:k===""?"default":"pointer",fontSize:16,fontWeight:500,opacity:k===""?0:1}},k)
+        )
       ),
       h(Btn,{onClick:onCancel,style:{width:"100%",justifyContent:"center"}},"Cancelar")
     )
@@ -155,7 +170,6 @@ function Login({onLogin}){
   );
 }
 
-// Modal generico
 function Modal({title,onClose,children,width}){
   return h("div",{style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50}},
     h("div",{style:{background:"#fff",borderRadius:14,padding:"1.5rem",width:width||380,border:"1px solid #ececec",maxHeight:"90vh",overflowY:"auto"}},
@@ -168,6 +182,7 @@ function Modal({title,onClose,children,width}){
   );
 }
 
+// ── App ───────────────────────────────────────────────────────────────────────
 function App(){
   const [role,setRole]=useState(null);
   const [tab,setTab]=useState("agenda");
@@ -230,17 +245,43 @@ function App(){
   const turnosSem=useMemo(()=>{
     const d=new Date(agDate),dow=d.getDay(),mon=new Date(d);
     mon.setDate(d.getDate()-(dow===0?6:dow-1));
-    return Array.from({length:7},(_,i)=>{const dd=new Date(mon);dd.setDate(mon.getDate()+i);const date=dd.toISOString().slice(0,10);return{date,ts:turnos.filter(t=>t.fecha===date).sort((a,b)=>a.hora.localeCompare(b.hora))};});
+    return Array.from({length:7},(_,i)=>{
+      const dd=new Date(mon);dd.setDate(mon.getDate()+i);
+      const date=dd.toISOString().slice(0,10);
+      return{date,ts:turnos.filter(t=>t.fecha===date).sort((a,b)=>a.hora.localeCompare(b.hora))};
+    });
   },[turnos,agDate]);
   const txsHoy=useMemo(()=>txs.filter(t=>dateOf(t.fecha)===today()),[txs]);
   const txsMes=useMemo(()=>txs.filter(t=>dateOf(t.fecha).slice(0,7)===today().slice(0,7)),[txs]);
   const filteredPats=useMemo(()=>patients.filter(p=>p.dni.includes(search)||p.apellido.toLowerCase().includes(search.toLowerCase())||p.nombre.toLowerCase().includes(search.toLowerCase())),[patients,search]);
 
+  const tdHoy=turnos.filter(t=>t.fecha===today());
+  const totales={
+    total:tdHoy.length,
+    asistio:tdHoy.filter(t=>normEstado(t.estado)==="Asistió").length,
+    pendiente:tdHoy.filter(t=>normEstado(t.estado)==="Pendiente").length,
+    ausente:tdHoy.filter(t=>normEstado(t.estado)==="Ausente").length,
+    cobrado:txsHoy.filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido").length
+  };
+
+  const cobList=l=>l.filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido");
+  const repBase=repPer==="diario"?txsHoy:txsMes;
+  const rep={
+    tot:cobList(repBase).reduce((s,t)=>s+t.monto,0),
+    ef:cobList(repBase).filter(t=>t.metodo==="Efectivo").reduce((s,t)=>s+t.monto,0),
+    tr:cobList(repBase).filter(t=>t.metodo==="Transferencia").reduce((s,t)=>s+t.monto,0)
+  };
+
   async function markAsist(tid,estado){
     let nP=patients;
-    const nT=turnos.map(t=>{if(t.id!==tid)return t;if(estado==="Asistió")nP=patients.map(p=>p.id===t.pacienteId&&p.sesiones>0?{...p,sesiones:p.sesiones-1}:p);return{...t,estado};});
+    const nT=turnos.map(t=>{
+      if(t.id!==tid)return t;
+      if(estado==="Asistió")nP=patients.map(p=>p.id===t.pacienteId&&p.sesiones>0?{...p,sesiones:p.sesiones-1}:p);
+      return{...t,estado};
+    });
     setTurnos(nT);setPatients(nP);
-    await save("turnos",nT);if(estado==="Asistió")await save("pacientes",nP);
+    await save("turnos",nT);
+    if(estado==="Asistió")await save("pacientes",nP);
   }
   async function addTurno(){
     if(!nTurno.pacienteId||!nTurno.fecha||!nTurno.hora)return;
@@ -289,50 +330,19 @@ function App(){
 
   if(!role)return h(Login,{onLogin:r=>{setRole(r);setTab("agenda");}});
   if(loading)return h("div",{style:{minHeight:"100vh",background:"#f5f5f5",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}},
-    h(LogoFull,{}),h("div",{style:{display:"flex",alignItems:"center",gap:10,color:C.primary,marginTop:16}},h(Spin,{size:20,color:C.primary}),h("span",{style:{fontSize:14}},loadMsg))
+    h(LogoFull,{}),
+    h("div",{style:{display:"flex",alignItems:"center",gap:10,color:C.primary,marginTop:16}},h(Spin,{size:20,color:C.primary}),h("span",{style:{fontSize:14}},loadMsg))
   );
 
-  // totalizador hoy
-  const tdHoy=turnos.filter(t=>t.fecha===today());
-  const totales={
-    total:tdHoy.length,
-    asistio:tdHoy.filter(t=>normEstado(t.estado)==="Asistió").length,
-    pendiente:tdHoy.filter(t=>normEstado(t.estado)==="Pendiente").length,
-    ausente:tdHoy.filter(t=>normEstado(t.estado)==="Ausente").length,
-    cobrado:txsHoy.filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido").length
-  };
-
-  // reporte caja
-  const cobList=l=>l.filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido");
-  const repBase=repPer==="diario"?txsHoy:txsMes;
-  const rep={tot:cobList(repBase).reduce((s,t)=>s+t.monto,0),ef:cobList(repBase).filter(t=>t.metodo==="Efectivo").reduce((s,t)=>s+t.monto,0),tr:cobList(repBase).filter(t=>t.metodo==="Transferencia").reduce((s,t)=>s+t.monto,0)};
-
-  function FormCobro({prefPac,prefTurno}){
-    return h("div",{},
-      !prefPac&&h(Sel,{label:"Paciente",value:nTx.pacienteId,onChange:e=>setNTx(p=>({...p,pacienteId:e.target.value,turnoId:""}))},
-        h("option",{value:""},"Seleccionar paciente..."),
-        ...patients.map(p=>h("option",{key:p.id,value:p.id},p.nombre+" "+p.apellido))
-      ),
-      h(Sel,{label:"Tipo de cobro",value:nTx.tipo,onChange:e=>setNTx(p=>({...p,tipo:e.target.value}))},
-        h("option",{},"Pago Total"),h("option",{},"Sena"),h("option",{},"Pago Parcial")
-      ),
-      h(Sel,{label:"Metodo",value:nTx.metodo,onChange:e=>setNTx(p=>({...p,metodo:e.target.value}))},
-        h("option",{},"Efectivo"),h("option",{},"Transferencia")
-      ),
-      !prefTurno&&h(Sel,{label:"Turno de hoy (opcional)",value:nTx.turnoId,onChange:e=>setNTx(p=>({...p,turnoId:e.target.value}))},
-        h("option",{value:""},"Sin turno especifico"),
-        ...turnosHoy.filter(t=>!nTx.pacienteId||t.pacienteId===parseInt(nTx.pacienteId)).map(t=>{
-          const pp=byId(patients,t.pacienteId);
-          return h("option",{key:t.id,value:t.id},t.hora+" - "+(pp?pp.nombre+" "+pp.apellido:"?")+" ("+t.estado+")");
-        })
-      ),
-      h(Inp,{label:"Monto ($)",type:"number",placeholder:"0",value:nTx.monto,onChange:e=>setNTx(p=>({...p,monto:e.target.value}))})
-    );
-  }
-
+  // ── render ────────────────────────────────────────────────────────────────
   return h("div",{style:{minHeight:"100vh",background:"#f5f5f5"}},
+
+    // toasts
     saving&&h("div",{style:{position:"fixed",top:10,right:16,zIndex:100,background:C.pL,color:C.primary,border:"1px solid "+C.primary,borderRadius:8,padding:"6px 12px",fontSize:12,display:"flex",alignItems:"center",gap:6}},h(Spin,{size:12,color:C.primary})," Guardando..."),
-    errMsg&&h("div",{style:{position:"fixed",top:10,right:16,zIndex:100,background:C.dL,color:C.danger,border:"1px solid "+C.danger,borderRadius:8,padding:"6px 12px",fontSize:12,maxWidth:320}},"! "+errMsg,h("button",{onClick:()=>setErrMsg(""),style:{marginLeft:8,background:"none",border:"none",cursor:"pointer",color:C.danger,fontWeight:700}},"x")),
+    errMsg&&h("div",{style:{position:"fixed",top:10,right:16,zIndex:100,background:C.dL,color:C.danger,border:"1px solid "+C.danger,borderRadius:8,padding:"6px 12px",fontSize:12,maxWidth:320}},
+      "! "+errMsg,
+      h("button",{onClick:()=>setErrMsg(""),style:{marginLeft:8,background:"none",border:"none",cursor:"pointer",color:C.danger,fontWeight:700}},"x")
+    ),
 
     // header
     h("div",{style:{background:"#fff",borderBottom:"1px solid #ececec",padding:"0 1.5rem",display:"flex",alignItems:"center",justifyContent:"space-between",height:52}},
@@ -348,6 +358,7 @@ function App(){
     ),
 
     h("div",{style:{display:"flex",height:"calc(100vh - 52px)"}},
+
       // sidebar
       h("div",{style:{width:185,background:"#fff",borderRight:"1px solid #ececec",padding:"1rem .75rem",display:"flex",flexDirection:"column",gap:4,flexShrink:0}},
         h("button",{style:tabSt("agenda"),onClick:()=>setTab("agenda")},"Agenda"),
@@ -357,18 +368,27 @@ function App(){
         isAdmin&&h("button",{style:tabSt("config"),onClick:()=>setTab("config")},"Configuracion")
       ),
 
-      // contenido
+      // contenido principal
       h("div",{style:{flex:1,overflowY:"auto",padding:"1.25rem"}},
 
-        // AGENDA
+        // ── AGENDA ──────────────────────────────────────────────────────────
         tab==="agenda"&&h("div",{},
           h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}},
-            h("div",{},h("h2",{style:{margin:0,fontSize:18}},"Agenda"),h("p",{style:{margin:"2px 0 0",fontSize:13,color:"#666"}},"Turnos diarios y semanales")),
+            h("div",{},
+              h("h2",{style:{margin:0,fontSize:18}},"Agenda"),
+              h("p",{style:{margin:"2px 0 0",fontSize:13,color:"#666"}},"Turnos diarios y semanales")
+            ),
             h(Btn,{variant:"primary",onClick:()=>setModal("turno")},"+ Nuevo turno")
           ),
           // totalizador
           h("div",{style:{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8,marginBottom:"1rem"}},
-            [["Total hoy",totales.total,"#555","#f0f0f0"],["Asistieron",totales.asistio,C.primary,C.pL],["Pendientes",totales.pendiente,C.warn,C.wL],["Ausentes",totales.ausente,C.danger,C.dL],["Cobrados",totales.cobrado,C.info,C.iL]].map(([l,v,color,bg])=>
+            [
+              ["Total hoy",totales.total,"#555","#f0f0f0"],
+              ["Asistieron",totales.asistio,C.primary,C.pL],
+              ["Pendientes",totales.pendiente,C.warn,C.wL],
+              ["Ausentes",totales.ausente,C.danger,C.dL],
+              ["Cobrados",totales.cobrado,C.info,C.iL]
+            ].map(([l,v,color,bg])=>
               h("div",{key:l,style:{background:bg,borderRadius:10,padding:"10px 12px",textAlign:"center"}},
                 h("p",{style:{margin:"0 0 2px",fontSize:11,color,fontWeight:500}},l),
                 h("p",{style:{margin:0,fontSize:22,fontWeight:500,color}},String(v))
@@ -384,26 +404,31 @@ function App(){
               ),
               turnosDia.length===0&&h("p",{style:{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}},"Sin turnos para este dia"),
               h("div",{style:{display:"flex",flexDirection:"column",gap:8}},
-                                  turnosDia.map(t=>{
+                turnosDia.map(t=>{
                   const pac=byId(patients,t.pacienteId);
-                  const pagado=txs.some(tx=>tx.estado==="Activo"&&tx.tipo!=="Plan vendido"&&(tx.turnoId===t.id||(tx.pacienteId===t.pacienteId&&dateOf(tx.fecha)===t.fecha)));
+                  const pagado=txs.some(tx=>tx.estado==="Activo"&&tx.tipo!=="Plan vendido"&&(Number(tx.turnoId)===t.id||(tx.pacienteId===t.pacienteId&&dateOf(tx.fecha)===t.fecha)));
                   return h("div",{key:t.id,style:{display:"flex",alignItems:"center",gap:6,padding:"8px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ececec"}},
-                    h("div",{style:{width:36,height:36,borderRadius:"50%",background:C.pL,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:500,fontSize:12,color:C.primary,flexShrink:0}},pac?(pac.nombre[0]+pac.apellido[0]):"?"),
+                    h("div",{style:{width:36,height:36,borderRadius:"50%",background:C.pL,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:500,fontSize:12,color:C.primary,flexShrink:0}},
+                      pac?(pac.nombre[0]+pac.apellido[0]):"?"
+                    ),
                     h("div",{style:{flex:1,minWidth:0}},
                       h("p",{style:{margin:0,fontSize:13,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}},pac?(pac.nombre+" "+pac.apellido):"—"),
                       h("p",{style:{margin:0,fontSize:11,color:"#666"}},t.hora+" · "+(pac?.sesiones??0)+" ses.")
                     ),
                     h(Badge,{color:eCol(t.estado),bg:eBg(t.estado),text:normEstado(t.estado)}),
-                    h(Badge,{color:pagado?C.primary:"#888",bg:pagado?C.pL:"#f0f0f0",text:pagado?"Pagado":"Sin cobro"}),
-                    h("div",{style:{display:"flex",gap:3}},
-                      t.estado==="Pendiente"&&h(Btn,{key:"as",small:true,variant:"primary",onClick:()=>markAsist(t.id,"Asistió"),style:{padding:"3px 7px"}},"V"),
-                      t.estado==="Pendiente"&&h(Btn,{key:"au",small:true,variant:"danger",onClick:()=>markAsist(t.id,"Ausente"),style:{padding:"3px 7px"}},"X"),
-                      h(Btn,{key:"ed",small:true,onClick:()=>{setETurno({...t});setModal("editTurno");},style:{padding:"3px 7px"}},"E"),
-                      h(Btn,{key:"co",small:true,onClick:()=>{
-                        setCobTurno(t);
-                        setNTx({pacienteId:String(t.pacienteId),tipo:"Pago Total",metodo:"Efectivo",monto:"",turnoId:String(t.id)});
-                        setModal("cobro");
-                      },style:{padding:"3px 7px",background:C.info,color:"#fff",border:"none"}},"$")
+                    h(Badge,{color:pagado?C.primary:"#999",bg:pagado?C.pL:"#f0f0f0",text:pagado?"Pagado":"Sin cobro"}),
+                    h("select",{
+                      value:normEstado(t.estado),
+                      onChange:e=>markAsist(t.id,e.target.value),
+                      style:{fontSize:11,padding:"2px 4px",borderRadius:6,border:"1px solid #ddd",background:"#fff",cursor:"pointer",width:"auto",maxWidth:95}
+                    },
+                      h("option",{value:"Pendiente"},"Pendiente"),
+                      h("option",{value:"Asistió"},"Asistio"),
+                      h("option",{value:"Ausente"},"Ausente")
+                    ),
+                    h("div",{style:{display:"flex",gap:3,flexShrink:0}},
+                      h(Btn,{small:true,onClick:()=>{setETurno({...t});setModal("editTurno");},style:{padding:"3px 7px"}},"E"),
+                      h(Btn,{small:true,onClick:()=>{setCobTurno(t);setNTx({pacienteId:String(t.pacienteId),tipo:"Pago Total",metodo:"Efectivo",monto:"",turnoId:String(t.id)});setModal("cobro");},style:{padding:"3px 7px",background:C.info,color:"#fff",border:"none"}},"$")
                     )
                   );
                 })
@@ -419,8 +444,15 @@ function App(){
                       new Date(date+"T12:00").toLocaleDateString("es-AR",{weekday:"short",day:"numeric",month:"short"}),
                       date===today()&&h("span",{style:{marginLeft:6,fontSize:10,background:C.primary,color:"#fff",borderRadius:4,padding:"1px 5px"}},"Hoy")
                     ),
-                    ts.length===0?h("p",{style:{margin:0,fontSize:11,color:"#999"}},"Sin turnos"):
-                    ts.map(t=>{const pp=byId(patients,t.pacienteId);return h("p",{key:t.id,style:{margin:"2px 0",fontSize:12}},t.hora+" - "+(pp?pp.nombre+" "+pp.apellido:"—")," ",h(Badge,{color:eCol(t.estado),bg:eBg(t.estado),text:normEstado(t.estado)}));})
+                    ts.length===0
+                      ?h("p",{style:{margin:0,fontSize:11,color:"#999"}},"Sin turnos")
+                      :ts.map(t=>{
+                        const pp=byId(patients,t.pacienteId);
+                        return h("p",{key:t.id,style:{margin:"2px 0",fontSize:12}},
+                          t.hora+" - "+(pp?pp.nombre+" "+pp.apellido:"—")," ",
+                          h(Badge,{color:eCol(t.estado),bg:eBg(t.estado),text:normEstado(t.estado)})
+                        );
+                      })
                   )
                 )
               )
@@ -428,7 +460,7 @@ function App(){
           )
         ),
 
-        // PACIENTES
+        // ── PACIENTES ────────────────────────────────────────────────────────
         tab==="pacientes"&&h("div",{},
           h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}},
             h("h2",{style:{margin:0,fontSize:18}},"Pacientes"),
@@ -442,56 +474,68 @@ function App(){
               ),
               filteredPats.length===0&&h("p",{style:{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}},"Sin pacientes"),
               h("div",{style:{display:"flex",flexDirection:"column",gap:6}},
-                filteredPats.map(p=>h("div",{key:p.id,onClick:()=>setSelPat(p.id),style:{padding:"10px 12px",borderRadius:10,border:"1px solid "+(selPat===p.id?C.primary:"#ececec"),background:selPat===p.id?C.pL:"#fff",cursor:"pointer"}},
-                  h("span",{style:{fontSize:13,fontWeight:500}},p.nombre+" "+p.apellido),h("br",{}),
-                  h("span",{style:{fontSize:11,color:"#666"}},"DNI "+p.dni+" · "+p.sesiones+" ses.")
-                ))
+                filteredPats.map(p=>
+                  h("div",{key:p.id,onClick:()=>setSelPat(p.id),style:{padding:"10px 12px",borderRadius:10,border:"1px solid "+(selPat===p.id?C.primary:"#ececec"),background:selPat===p.id?C.pL:"#fff",cursor:"pointer"}},
+                    h("span",{style:{fontSize:13,fontWeight:500}},p.nombre+" "+p.apellido),
+                    h("br",{}),
+                    h("span",{style:{fontSize:11,color:"#666"}},"DNI "+p.dni+" · "+p.sesiones+" ses.")
+                  )
+                )
               )
             ),
             selPat?(()=>{
-              const p=patients.find(pp=>pp.id===selPat);if(!p)return null;
+              const p=patients.find(pp=>pp.id===selPat);
+              if(!p)return null;
               const planTxs=txs.filter(t=>t.pacienteId===p.id&&t.tipo==="Plan vendido");
               return h("div",{style:{display:"flex",flexDirection:"column",gap:"1rem"}},
                 h(Card,{},
                   h("div",{style:{display:"flex",alignItems:"center",gap:12,marginBottom:14}},
                     h("div",{style:{width:44,height:44,borderRadius:"50%",background:C.pL,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:500,fontSize:14,color:C.primary,flexShrink:0}},p.nombre[0]+p.apellido[0]),
-                    h("div",{},h("p",{style:{margin:0,fontWeight:500,fontSize:15}},p.nombre+" "+p.apellido),h("p",{style:{margin:0,fontSize:12,color:"#666"}},"DNI "+p.dni+" · "+fmtD(p.fechaNac))),
-                    h("div",{style:{marginLeft:"auto",textAlign:"right"}},h("p",{style:{margin:0,fontSize:11,color:"#666"}},"Sesiones"),h("p",{style:{margin:0,fontSize:22,fontWeight:500,color:p.sesiones===0?C.danger:C.primary}},p.sesiones))
+                    h("div",{},
+                      h("p",{style:{margin:0,fontWeight:500,fontSize:15}},p.nombre+" "+p.apellido),
+                      h("p",{style:{margin:0,fontSize:12,color:"#666"}},"DNI "+p.dni+" · "+fmtD(p.fechaNac))
+                    ),
+                    h("div",{style:{marginLeft:"auto",textAlign:"right"}},
+                      h("p",{style:{margin:0,fontSize:11,color:"#666"}},"Sesiones"),
+                      h("p",{style:{margin:0,fontSize:22,fontWeight:500,color:p.sesiones===0?C.danger:C.primary}},p.sesiones)
+                    )
                   ),
                   h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"4px 12px",fontSize:12,borderTop:"1px solid #ececec",paddingTop:10}},
                     [["Tel",p.tel],["Email",p.email],["Dir",p.dir]].map(([k,v])=>h("div",{key:k},h("span",{style:{color:"#666"}},k+": "),v||"—"))
                   )
                 ),
-                // historial planes
                 h(Card,{},
                   h("p",{style:{margin:"0 0 10px",fontWeight:500,fontSize:14}},"Historial de planes"),
-                  planTxs.length===0?h("p",{style:{fontSize:13,color:"#666"}},"Sin planes asignados."):
-                  h("div",{style:{display:"flex",flexDirection:"column",gap:6}},
-                    planTxs.map(t=>{
-                      const pl=byId(plans,t.planId);
-                      return h("div",{key:t.id,style:{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:t.estado==="Anulado"?"#f8f8f8":C.pL,border:"1px solid "+(t.estado==="Anulado"?"#ececec":C.primary),opacity:t.estado==="Anulado"?.5:1}},
-                        h("div",{style:{flex:1}},
-                          h("p",{style:{margin:0,fontSize:13,fontWeight:500,textDecoration:t.estado==="Anulado"?"line-through":"none",color:t.estado==="Anulado"?"#999":C.primary}},pl?pl.name:"Plan"),
-                          h("p",{style:{margin:0,fontSize:11,color:"#666"}},dateOf(t.fecha)+" · "+fmt(t.monto))
-                        ),
-                        h(Badge,{color:t.estado==="Activo"?C.primary:C.danger,bg:t.estado==="Activo"?C.pL:C.dL,text:t.estado}),
-                        isAdmin&&t.estado==="Activo"&&h(Btn,{small:true,variant:"danger",onClick:()=>anularTx(t.id)},"Anular")
-                      );
-                    })
-                  )
+                  planTxs.length===0
+                    ?h("p",{style:{fontSize:13,color:"#666"}},"Sin planes asignados.")
+                    :h("div",{style:{display:"flex",flexDirection:"column",gap:6}},
+                        planTxs.map(t=>{
+                          const pl=byId(plans,t.planId);
+                          return h("div",{key:t.id,style:{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:t.estado==="Anulado"?"#f8f8f8":C.pL,border:"1px solid "+(t.estado==="Anulado"?"#ececec":C.primary),opacity:t.estado==="Anulado"?.5:1}},
+                            h("div",{style:{flex:1}},
+                              h("p",{style:{margin:0,fontSize:13,fontWeight:500,textDecoration:t.estado==="Anulado"?"line-through":"none",color:t.estado==="Anulado"?"#999":C.primary}},pl?pl.name:"Plan"),
+                              h("p",{style:{margin:0,fontSize:11,color:"#666"}},dateOf(t.fecha)+" · "+fmt(t.monto))
+                            ),
+                            h(Badge,{color:t.estado==="Activo"?C.primary:C.danger,bg:t.estado==="Activo"?C.pL:C.dL,text:t.estado}),
+                            isAdmin&&t.estado==="Activo"&&h(Btn,{small:true,variant:"danger",onClick:()=>anularTx(t.id)},"Anular")
+                          );
+                        })
+                      )
                 ),
-                // vender plan
                 h(Card,{},
                   h("p",{style:{margin:"0 0 10px",fontWeight:500,fontSize:14}},"Vender plan"),
-                  plans.length===0?h("p",{style:{fontSize:13,color:C.warn}},isAdmin?"Configura planes primero.":"Pedile al admin que configure los planes."):
-                  h("div",{style:{display:"flex",gap:8,flexWrap:"wrap"}},
-                    plans.map(pl=>h("div",{key:pl.id,style:{flex:1,minWidth:130,border:"1px solid #ececec",borderRadius:10,padding:"10px 12px",textAlign:"center"}},
-                      h("p",{style:{margin:"0 0 2px",fontSize:13,fontWeight:500}},pl.name),
-                      h("p",{style:{margin:"0 0 4px",fontSize:11,color:"#666"}},pl.sessions+" sesiones"),
-                      h("p",{style:{margin:"0 0 8px",fontSize:14,fontWeight:500,color:C.primary}},fmt(pl.price)),
-                      h(Btn,{small:true,variant:"primary",onClick:()=>venderPlan(p.id,pl.id),style:{width:"100%",justifyContent:"center"}},"Vender")
-                    ))
-                  )
+                  plans.length===0
+                    ?h("p",{style:{fontSize:13,color:C.warn}},isAdmin?"Configura planes primero.":"Pedile al admin que configure los planes.")
+                    :h("div",{style:{display:"flex",gap:8,flexWrap:"wrap"}},
+                        plans.map(pl=>
+                          h("div",{key:pl.id,style:{flex:1,minWidth:130,border:"1px solid #ececec",borderRadius:10,padding:"10px 12px",textAlign:"center"}},
+                            h("p",{style:{margin:"0 0 2px",fontSize:13,fontWeight:500}},pl.name),
+                            h("p",{style:{margin:"0 0 4px",fontSize:11,color:"#666"}},pl.sessions+" sesiones"),
+                            h("p",{style:{margin:"0 0 8px",fontSize:14,fontWeight:500,color:C.primary}},fmt(pl.price)),
+                            h(Btn,{small:true,variant:"primary",onClick:()=>venderPlan(p.id,pl.id),style:{width:"100%",justifyContent:"center"}},"Vender")
+                          )
+                        )
+                      )
                 ),
                 h(Card,{},
                   h("p",{style:{margin:"0 0 8px",fontWeight:500,fontSize:14}},"Seguimiento clinico"),
@@ -499,24 +543,48 @@ function App(){
                   h("p",{style:{margin:"4px 0 0",fontSize:11,color:"#999"}},"Se guarda al salir del campo.")
                 )
               );
-            })():h(Card,{style:{display:"flex",alignItems:"center",justifyContent:"center",minHeight:200,color:"#999"}},h("p",{style:{margin:0,fontSize:13}},"Selecciona un paciente"))
+            })()
+            :h(Card,{style:{display:"flex",alignItems:"center",justifyContent:"center",minHeight:200,color:"#999"}},
+                h("p",{style:{margin:0,fontSize:13}},"Selecciona un paciente")
+              )
           )
         ),
 
-        // COBROS
+        // ── COBROS ───────────────────────────────────────────────────────────
         tab==="cobros"&&h("div",{},
-          h("div",{style:{marginBottom:"1rem"}},h("h2",{style:{margin:0,fontSize:18}},"Cobros"),h("p",{style:{margin:"2px 0 0",fontSize:13,color:"#666"}},"Registra senas, pagos totales o parciales")),
+          h("div",{style:{marginBottom:"1rem"}},
+            h("h2",{style:{margin:0,fontSize:18}},"Cobros"),
+            h("p",{style:{margin:"2px 0 0",fontSize:13,color:"#666"}},"Registra senas, pagos totales o parciales")
+          ),
           h(Card,{style:{maxWidth:480}},
             h("p",{style:{margin:"0 0 12px",fontWeight:500,fontSize:14}},"Nuevo cobro"),
-            h(FormCobro,{prefPac:false,prefTurno:false}),
+            h(Sel,{label:"Paciente",value:nTx.pacienteId,onChange:e=>setNTx(p=>({...p,pacienteId:e.target.value,turnoId:""}))},
+              h("option",{value:""},"Seleccionar paciente..."),
+              ...patients.map(p=>h("option",{key:p.id,value:p.id},p.nombre+" "+p.apellido))
+            ),
+            h(Sel,{label:"Tipo de cobro",value:nTx.tipo,onChange:e=>setNTx(p=>({...p,tipo:e.target.value}))},
+              h("option",{},"Pago Total"),h("option",{},"Sena"),h("option",{},"Pago Parcial")
+            ),
+            h(Sel,{label:"Metodo",value:nTx.metodo,onChange:e=>setNTx(p=>({...p,metodo:e.target.value}))},
+              h("option",{},"Efectivo"),h("option",{},"Transferencia")
+            ),
+            h(Sel,{label:"Turno de hoy (opcional)",value:nTx.turnoId,onChange:e=>setNTx(p=>({...p,turnoId:e.target.value}))},
+              h("option",{value:""},"Sin turno especifico"),
+              ...turnosHoy.filter(t=>!nTx.pacienteId||t.pacienteId===parseInt(nTx.pacienteId)).map(t=>{
+                const pp=byId(patients,t.pacienteId);
+                return h("option",{key:t.id,value:t.id},t.hora+" - "+(pp?pp.nombre+" "+pp.apellido:"?")+" ("+normEstado(t.estado)+")");
+              })
+            ),
+            h(Inp,{label:"Monto ($)",type:"number",placeholder:"0",value:nTx.monto,onChange:e=>setNTx(p=>({...p,monto:e.target.value}))}),
             h(Btn,{variant:"primary",disabled:!nTx.pacienteId||!nTx.monto,onClick:addTx,style:{width:"100%",justifyContent:"center",marginTop:4}},"+ Registrar cobro")
           )
         ),
 
-        // CAJA
+        // ── CAJA ─────────────────────────────────────────────────────────────
         tab==="caja"&&isAdmin&&h("div",{},
           h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}},
-            h("h2",{style:{margin:0,fontSize:18}},"Caja y finanzas"),h(Badge,{color:C.info,bg:C.iL,text:"Solo administrador"})
+            h("h2",{style:{margin:0,fontSize:18}},"Caja y finanzas"),
+            h(Badge,{color:C.info,bg:C.iL,text:"Solo administrador"})
           ),
           h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem"}},
             h(Card,{},
@@ -537,60 +605,66 @@ function App(){
               ),
               h("div",{style:{borderTop:"1px solid #ececec",paddingTop:10}},
                 h("p",{style:{margin:"0 0 6px",fontSize:12,fontWeight:500,color:"#666"}},"Detalle"),
-                cobList(repBase).length===0?h("p",{style:{fontSize:13,color:"#999",textAlign:"center",padding:"8px 0"}},"Sin cobros en este periodo"):
-                cobList(repBase).map(t=>{
-                  const pp=byId(patients,t.pacienteId);
-                  return h("div",{key:t.id,style:{display:"flex",justifyContent:"space-between",fontSize:12,padding:"4px 0",borderBottom:"1px solid #ececec",alignItems:"center"}},
-                    h("span",{},(pp?pp.nombre+" "+pp.apellido:"—")+" · "+t.tipo+" · "+t.metodo),
-                    h("span",{style:{color:C.primary,fontWeight:500}},fmt(t.monto))
-                  );
-                })
+                cobList(repBase).length===0
+                  ?h("p",{style:{fontSize:13,color:"#999",textAlign:"center",padding:"8px 0"}},"Sin cobros en este periodo")
+                  :cobList(repBase).map(t=>{
+                      const pp=byId(patients,t.pacienteId);
+                      return h("div",{key:t.id,style:{display:"flex",justifyContent:"space-between",fontSize:12,padding:"4px 0",borderBottom:"1px solid #ececec"}},
+                        h("span",{},(pp?pp.nombre+" "+pp.apellido:"—")+" · "+t.tipo+" · "+t.metodo),
+                        h("span",{style:{color:C.primary,fontWeight:500}},fmt(t.monto))
+                      );
+                    })
               )
             ),
             h(Card,{},
-              h("p",{style:{margin:"0 0 12px",fontWeight:500,fontSize:14}},"Cobros del dia - con anulacion"),
-              txsHoy.filter(t=>t.tipo!=="Plan vendido").length===0?h("p",{style:{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}},"Sin cobros hoy"):
-              h("div",{style:{display:"flex",flexDirection:"column",gap:6}},
-                txsHoy.filter(t=>t.tipo!=="Plan vendido").map(t=>{
-                  const pp=byId(patients,t.pacienteId);
-                  return h("div",{key:t.id,style:{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:t.estado==="Anulado"?"#f8f8f8":"#fff",border:"1px solid #ececec",opacity:t.estado==="Anulado"?.5:1}},
-                    h("div",{style:{flex:1}},
-                      h("p",{style:{margin:0,fontSize:13,fontWeight:500,textDecoration:t.estado==="Anulado"?"line-through":"none"}},pp?pp.nombre+" "+pp.apellido:"—"),
-                      h("p",{style:{margin:0,fontSize:11,color:"#666"}},t.tipo+" · "+t.metodo+" · "+t.fecha.replace("T"," ").slice(11,16))
-                    ),
-                    h("span",{style:{fontWeight:500,color:t.estado==="Anulado"?"#999":C.primary}},fmt(t.monto)),
-                    h(Badge,{color:t.estado==="Activo"?C.primary:C.danger,bg:t.estado==="Activo"?C.pL:C.dL,text:t.estado}),
-                    t.estado==="Activo"&&h(Btn,{small:true,variant:"danger",onClick:()=>anularTx(t.id)},"Anular")
-                  );
-                })
-              )
+              h("p",{style:{margin:"0 0 12px",fontWeight:500,fontSize:14}},"Cobros del dia — con anulacion"),
+              txsHoy.filter(t=>t.tipo!=="Plan vendido").length===0
+                ?h("p",{style:{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}},"Sin cobros hoy")
+                :h("div",{style:{display:"flex",flexDirection:"column",gap:6}},
+                    txsHoy.filter(t=>t.tipo!=="Plan vendido").map(t=>{
+                      const pp=byId(patients,t.pacienteId);
+                      return h("div",{key:t.id,style:{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:t.estado==="Anulado"?"#f8f8f8":"#fff",border:"1px solid #ececec",opacity:t.estado==="Anulado"?.5:1}},
+                        h("div",{style:{flex:1}},
+                          h("p",{style:{margin:0,fontSize:13,fontWeight:500,textDecoration:t.estado==="Anulado"?"line-through":"none"}},pp?pp.nombre+" "+pp.apellido:"—"),
+                          h("p",{style:{margin:0,fontSize:11,color:"#666"}},t.tipo+" · "+t.metodo+" · "+t.fecha.replace("T"," ").slice(11,16))
+                        ),
+                        h("span",{style:{fontWeight:500,color:t.estado==="Anulado"?"#999":C.primary}},fmt(t.monto)),
+                        h(Badge,{color:t.estado==="Activo"?C.primary:C.danger,bg:t.estado==="Activo"?C.pL:C.dL,text:t.estado}),
+                        t.estado==="Activo"&&h(Btn,{small:true,variant:"danger",onClick:()=>anularTx(t.id)},"Anular")
+                      );
+                    })
+                  )
             )
           ),
-          // ventas de planes
           h(Card,{style:{marginTop:"1rem"}},
             h("p",{style:{margin:"0 0 12px",fontWeight:500,fontSize:14}},"Ventas de planes del dia"),
-            txsHoy.filter(t=>t.tipo==="Plan vendido").length===0?h("p",{style:{fontSize:13,color:"#666",textAlign:"center",padding:"8px 0"}},"Sin ventas de planes hoy"):
-            h("div",{style:{display:"flex",flexDirection:"column",gap:6}},
-              txsHoy.filter(t=>t.tipo==="Plan vendido").map(t=>{
-                const pp=byId(patients,t.pacienteId);const pl=byId(plans,t.planId);
-                return h("div",{key:t.id,style:{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:t.estado==="Anulado"?"#f8f8f8":"#fff",border:"1px solid #ececec",opacity:t.estado==="Anulado"?.5:1}},
-                  h("div",{style:{flex:1}},
-                    h("p",{style:{margin:0,fontSize:13,fontWeight:500,textDecoration:t.estado==="Anulado"?"line-through":"none"}},pp?pp.nombre+" "+pp.apellido:"—"),
-                    h("p",{style:{margin:0,fontSize:11,color:"#666"}},(pl?pl.name:"Plan")+" · "+t.fecha.replace("T"," ").slice(11,16))
-                  ),
-                  h("span",{style:{fontWeight:500,color:t.estado==="Anulado"?"#999":C.primary}},fmt(t.monto)),
-                  h(Badge,{color:t.estado==="Activo"?C.primary:C.danger,bg:t.estado==="Activo"?C.pL:C.dL,text:t.estado}),
-                  t.estado==="Activo"&&h(Btn,{small:true,variant:"danger",onClick:()=>anularTx(t.id)},"Anular")
-                );
-              })
-            )
+            txsHoy.filter(t=>t.tipo==="Plan vendido").length===0
+              ?h("p",{style:{fontSize:13,color:"#666",textAlign:"center",padding:"8px 0"}},"Sin ventas de planes hoy")
+              :h("div",{style:{display:"flex",flexDirection:"column",gap:6}},
+                  txsHoy.filter(t=>t.tipo==="Plan vendido").map(t=>{
+                    const pp=byId(patients,t.pacienteId);
+                    const pl=byId(plans,t.planId);
+                    return h("div",{key:t.id,style:{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:t.estado==="Anulado"?"#f8f8f8":"#fff",border:"1px solid #ececec",opacity:t.estado==="Anulado"?.5:1}},
+                      h("div",{style:{flex:1}},
+                        h("p",{style:{margin:0,fontSize:13,fontWeight:500,textDecoration:t.estado==="Anulado"?"line-through":"none"}},pp?pp.nombre+" "+pp.apellido:"—"),
+                        h("p",{style:{margin:0,fontSize:11,color:"#666"}},(pl?pl.name:"Plan")+" · "+t.fecha.replace("T"," ").slice(11,16))
+                      ),
+                      h("span",{style:{fontWeight:500,color:t.estado==="Anulado"?"#999":C.primary}},fmt(t.monto)),
+                      h(Badge,{color:t.estado==="Activo"?C.primary:C.danger,bg:t.estado==="Activo"?C.pL:C.dL,text:t.estado}),
+                      t.estado==="Activo"&&h(Btn,{small:true,variant:"danger",onClick:()=>anularTx(t.id)},"Anular")
+                    );
+                  })
+                )
           )
         ),
 
-        // CONFIG
+        // ── CONFIG ────────────────────────────────────────────────────────────
         tab==="config"&&isAdmin&&h("div",{},
           h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}},
-            h("div",{},h("h2",{style:{margin:0,fontSize:18}},"Planes"),h("p",{style:{margin:"2px 0 0",fontSize:13,color:"#666"}},"Se guarda en Google Sheets")),
+            h("div",{},
+              h("h2",{style:{margin:0,fontSize:18}},"Planes"),
+              h("p",{style:{margin:"2px 0 0",fontSize:13,color:"#666"}},"Se guarda en Google Sheets")
+            ),
             h("div",{style:{display:"flex",gap:8,alignItems:"center"}},
               planMsg&&h("span",{style:{fontSize:12,color:C.primary}},planMsg),
               h(Btn,{onClick:()=>setEPlans(p=>[...p,{id:nextId(p),name:"Nuevo Plan",sessions:1,price:0}])},"+ Agregar"),
@@ -600,17 +674,33 @@ function App(){
           h(Card,{},
             ePlans.length===0&&h("p",{style:{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}},"No hay planes."),
             h("div",{style:{display:"flex",flexDirection:"column",gap:10}},
-              ePlans.map(pl=>h("div",{key:pl.id,style:{display:"grid",gridTemplateColumns:"1fr 110px 150px 40px",gap:10,alignItems:"center",padding:"10px 12px",borderRadius:10,border:"1px solid #ececec",background:"#f8f8f8"}},
-                h("div",{},h("label",{style:{fontSize:11,color:"#666",display:"block",marginBottom:3}},"Nombre"),h("input",{value:pl.name,onChange:e=>setEPlans(p=>p.map(x=>x.id===pl.id?{...x,name:e.target.value}:x)),style:{fontWeight:500}})),
-                h("div",{},h("label",{style:{fontSize:11,color:"#666",display:"block",marginBottom:3}},"Sesiones"),h("input",{type:"number",min:1,value:pl.sessions,onChange:e=>setEPlans(p=>p.map(x=>x.id===pl.id?{...x,sessions:Number(e.target.value)}:x))})),
-                h("div",{},h("label",{style:{fontSize:11,color:"#666",display:"block",marginBottom:3}},"Precio ($)"),h("input",{type:"number",min:0,value:pl.price,onChange:e=>setEPlans(p=>p.map(x=>x.id===pl.id?{...x,price:Number(e.target.value)}:x))})),
-                h(Btn,{small:true,variant:"danger",onClick:()=>setEPlans(p=>p.filter(x=>x.id!==pl.id)),style:{alignSelf:"flex-end",marginBottom:1}},"X")
-              ))
+              ePlans.map(pl=>
+                h("div",{key:pl.id,style:{display:"grid",gridTemplateColumns:"1fr 110px 150px 40px",gap:10,alignItems:"center",padding:"10px 12px",borderRadius:10,border:"1px solid #ececec",background:"#f8f8f8"}},
+                  h("div",{},
+                    h("label",{style:{fontSize:11,color:"#666",display:"block",marginBottom:3}},"Nombre"),
+                    h("input",{value:pl.name,onChange:e=>setEPlans(p=>p.map(x=>x.id===pl.id?{...x,name:e.target.value}:x)),style:{fontWeight:500}})
+                  ),
+                  h("div",{},
+                    h("label",{style:{fontSize:11,color:"#666",display:"block",marginBottom:3}},"Sesiones"),
+                    h("input",{type:"number",min:1,value:pl.sessions,onChange:e=>setEPlans(p=>p.map(x=>x.id===pl.id?{...x,sessions:Number(e.target.value)}:x))})
+                  ),
+                  h("div",{},
+                    h("label",{style:{fontSize:11,color:"#666",display:"block",marginBottom:3}},"Precio ($)"),
+                    h("input",{type:"number",min:0,value:pl.price,onChange:e=>setEPlans(p=>p.map(x=>x.id===pl.id?{...x,price:Number(e.target.value)}:x))})
+                  ),
+                  h(Btn,{small:true,variant:"danger",onClick:()=>setEPlans(p=>p.filter(x=>x.id!==pl.id)),style:{alignSelf:"flex-end",marginBottom:1}},"X")
+                )
+              )
             ),
             ePlans.length>0&&h("div",{style:{marginTop:14,padding:"10px 12px",borderRadius:10,background:C.pL,border:"1px solid "+C.primary}},
               h("p",{style:{margin:"0 0 8px",fontSize:12,color:C.primary,fontWeight:500}},"Vista previa"),
               h("div",{style:{display:"flex",gap:8,flexWrap:"wrap"}},
-                ePlans.map(pl=>h("div",{key:pl.id,style:{background:"#fff",borderRadius:8,padding:"8px 12px",fontSize:12,border:"1px solid #ececec"}},pl.name+" · "+pl.sessions+" ses. · ",h("span",{style:{color:C.primary,fontWeight:500}},fmt(pl.price))))
+                ePlans.map(pl=>
+                  h("div",{key:pl.id,style:{background:"#fff",borderRadius:8,padding:"8px 12px",fontSize:12,border:"1px solid #ececec"}},
+                    pl.name+" · "+pl.sessions+" ses. · ",
+                    h("span",{style:{color:C.primary,fontWeight:500}},fmt(pl.price))
+                  )
+                )
               )
             )
           )
@@ -619,7 +709,7 @@ function App(){
       ) // fin contenido
     ), // fin layout
 
-    // MODAL: nuevo turno
+    // ── MODALES ───────────────────────────────────────────────────────────────
     modal==="turno"&&h(Modal,{title:"Agendar turno",onClose:()=>setModal(null)},
       h(Sel,{label:"Paciente",value:nTurno.pacienteId,onChange:e=>setNTurno(p=>({...p,pacienteId:e.target.value}))},
         h("option",{value:""},"Seleccionar..."),
@@ -635,7 +725,6 @@ function App(){
       )
     ),
 
-    // MODAL: editar turno
     modal==="editTurno"&&eTurno&&h(Modal,{title:"Editar turno",onClose:()=>{setModal(null);setETurno(null);}},
       h("div",{style:{marginBottom:12,padding:"8px 12px",borderRadius:8,background:C.pL,fontSize:13,fontWeight:500}},
         (()=>{const pp=byId(patients,eTurno.pacienteId);return pp?pp.nombre+" "+pp.apellido:"—";})()
@@ -650,10 +739,11 @@ function App(){
       )
     ),
 
-    // MODAL: cobro rapido desde agenda
     modal==="cobro"&&cobTurno&&h(Modal,{title:"Registrar cobro",onClose:()=>{setModal(null);setCobTurno(null);}},
       h("div",{style:{marginBottom:12,padding:"8px 12px",borderRadius:8,background:C.pL,fontSize:13}},
-        h("p",{style:{margin:0,fontWeight:500,color:C.primary}},(()=>{const pp=byId(patients,cobTurno.pacienteId);return pp?pp.nombre+" "+pp.apellido:"—";})()),
+        h("p",{style:{margin:0,fontWeight:500,color:C.primary}},
+          (()=>{const pp=byId(patients,cobTurno.pacienteId);return pp?pp.nombre+" "+pp.apellido:"—";})()
+        ),
         h("p",{style:{margin:0,fontSize:11,color:"#666"}},"Turno "+cobTurno.hora+" · "+cobTurno.fecha)
       ),
       h(Sel,{label:"Tipo de cobro",value:nTx.tipo,onChange:e=>setNTx(p=>({...p,tipo:e.target.value}))},
@@ -669,7 +759,6 @@ function App(){
       )
     ),
 
-    // MODAL: nuevo paciente
     modal==="paciente"&&h(Modal,{title:"Nuevo paciente",onClose:()=>setModal(null),width:400},
       ...[["nombre","Nombre","text"],["apellido","Apellido","text"],["dni","DNI","text"],["fechaNac","Fecha de nacimiento","date"],["tel","Telefono","tel"],["email","Email","email"],["dir","Direccion","text"]].map(([k,l,t])=>
         h(Inp,{key:k,label:l,type:t,value:nPac[k],onChange:e=>setNPac(p=>({...p,[k]:e.target.value}))})
@@ -680,8 +769,8 @@ function App(){
       )
     )
 
-  );
-}
+  ); // fin return App
+} // fin App
 
 ReactDOM.createRoot(document.getElementById("root")).render(h(App,{}));
 </script>
