@@ -204,6 +204,7 @@ function App(){
   const [nTx,setNTx]=useState({pacienteId:"",tipo:"Pago Total",metodo:"Efectivo",monto:"",turnoId:""});
   const [cobTurno,setCobTurno]=useState(null);
   const [repPer,setRepPer]=useState("diario");
+  const [repDate,setRepDate]=useState(today());
   const [ePlans,setEPlans]=useState([]);
   const [planMsg,setPlanMsg]=useState("");
 
@@ -253,6 +254,7 @@ function App(){
   },[turnos,agDate]);
   const txsHoy=useMemo(()=>txs.filter(t=>dateOf(t.fecha)===today()),[txs]);
   const txsMes=useMemo(()=>txs.filter(t=>dateOf(t.fecha).slice(0,7)===today().slice(0,7)),[txs]);
+  const txsFecha=useMemo(()=>txs.filter(t=>dateOf(t.fecha)===repDate),[txs,repDate]);
   const filteredPats=useMemo(()=>patients.filter(p=>p.dni.includes(search)||p.apellido.toLowerCase().includes(search.toLowerCase())||p.nombre.toLowerCase().includes(search.toLowerCase())),[patients,search]);
 
   const tdHoy=turnos.filter(t=>t.fecha===today());
@@ -265,7 +267,7 @@ function App(){
   };
 
   const cobList=l=>l.filter(t=>t.estado==="Activo"&&t.tipo!=="Plan vendido");
-  const repBase=repPer==="diario"?txsHoy:txsMes;
+  const repBase=repPer==="diario"?txsFecha:txsMes;
   const rep={
     tot:cobList(repBase).reduce((s,t)=>s+t.monto,0),
     ef:cobList(repBase).filter(t=>t.metodo==="Efectivo").reduce((s,t)=>s+t.monto,0),
@@ -594,8 +596,9 @@ function App(){
             h(Card,{},
               h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}},
                 h("p",{style:{margin:0,fontWeight:500,fontSize:14}},"Reporte de cobros"),
-                h("div",{style:{display:"flex",gap:4}},
-                  h(Btn,{small:true,variant:repPer==="diario"?"primary":"default",onClick:()=>setRepPer("diario")},"Hoy"),
+                h("div",{style:{display:"flex",gap:4,alignItems:"center"}},
+                  repPer==="diario"&&h("input",{type:"date",value:repDate,onChange:e=>setRepDate(e.target.value),style:{fontSize:12,padding:"3px 6px",width:"auto"}}),
+                  h(Btn,{small:true,variant:repPer==="diario"?"primary":"default",onClick:()=>setRepPer("diario")},"Por dia"),
                   h(Btn,{small:true,variant:repPer==="mensual"?"primary":"default",onClick:()=>setRepPer("mensual")},"Mes")
                 )
               ),
@@ -613,24 +616,28 @@ function App(){
                   ?h("p",{style:{fontSize:13,color:"#999",textAlign:"center",padding:"8px 0"}},"Sin cobros en este periodo")
                   :cobList(repBase).map(t=>{
                       const pp=byId(patients,t.pacienteId);
-                      return h("div",{key:t.id,style:{display:"flex",justifyContent:"space-between",fontSize:12,padding:"4px 0",borderBottom:"1px solid #ececec"}},
-                        h("span",{},(pp?pp.nombre+" "+pp.apellido:"—")+" · "+t.tipo+" · "+t.metodo),
-                        h("span",{style:{color:C.primary,fontWeight:500}},fmt(t.monto))
+                      return h("div",{key:t.id,style:{display:"flex",justifyContent:"space-between",fontSize:12,padding:"4px 0",borderBottom:"1px solid #ececec",alignItems:"center",gap:6}},
+                        h("div",{style:{flex:1}},
+                          h("span",{style:{display:"block"}},(pp?pp.nombre+" "+pp.apellido:"—")+" · "+t.tipo+" · "+t.metodo),
+                          h("span",{style:{fontSize:11,color:"#999"}},fmtD(dateOf(t.fecha))+" "+t.fecha.replace("T"," ").slice(11,16))
+                        ),
+                        h("span",{style:{color:C.primary,fontWeight:500,whiteSpace:"nowrap"}},fmt(t.monto)),
+                        h(Btn,{small:true,variant:"danger",onClick:()=>anularTx(t.id),style:{padding:"2px 8px",fontSize:11}},"Anular")
                       );
                     })
               )
             ),
             h(Card,{},
-              h("p",{style:{margin:"0 0 12px",fontWeight:500,fontSize:14}},"Cobros del dia — con anulacion"),
-              txsHoy.filter(t=>t.tipo!=="Plan vendido").length===0
-                ?h("p",{style:{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}},"Sin cobros hoy")
+              h("p",{style:{margin:"0 0 12px",fontWeight:500,fontSize:14}},"Cobros del "+fmtD(repDate)+" — con anulacion"),
+              txsFecha.filter(t=>t.tipo!=="Plan vendido").length===0
+                ?h("p",{style:{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}},"Sin cobros en esta fecha")
                 :h("div",{style:{display:"flex",flexDirection:"column",gap:6}},
-                    txsHoy.filter(t=>t.tipo!=="Plan vendido").map(t=>{
+                    txsFecha.filter(t=>t.tipo!=="Plan vendido").map(t=>{
                       const pp=byId(patients,t.pacienteId);
                       return h("div",{key:t.id,style:{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:t.estado==="Anulado"?"#f8f8f8":"#fff",border:"1px solid #ececec",opacity:t.estado==="Anulado"?.5:1}},
                         h("div",{style:{flex:1}},
                           h("p",{style:{margin:0,fontSize:13,fontWeight:500,textDecoration:t.estado==="Anulado"?"line-through":"none"}},pp?pp.nombre+" "+pp.apellido:"—"),
-                          h("p",{style:{margin:0,fontSize:11,color:"#666"}},t.tipo+" · "+t.metodo+" · "+t.fecha.replace("T"," ").slice(11,16))
+                          h("p",{style:{margin:0,fontSize:11,color:"#666"}},t.tipo+" · "+t.metodo+" · "+fmtD(dateOf(t.fecha))+" "+t.fecha.replace("T"," ").slice(11,16))
                         ),
                         h("span",{style:{fontWeight:500,color:t.estado==="Anulado"?"#999":C.primary}},fmt(t.monto)),
                         h(Badge,{color:t.estado==="Activo"?C.primary:C.danger,bg:t.estado==="Activo"?C.pL:C.dL,text:t.estado}),
