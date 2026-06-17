@@ -212,6 +212,13 @@ function App(){
   const byId=(arr,id)=>arr.find(x=>Number(x.id)===Number(id));
   const nextId=arr=>arr.length>0?Math.max(...arr.map(x=>Number(x.id)))+1:1;
 
+  // Saldo del paciente = planes contratados (activos) - cobros realizados (activos, no planes)
+  const saldoPaciente=pid=>{
+    const planes=txs.filter(t=>t.pacienteId===pid&&t.estado==="Activo"&&t.tipo==="Plan vendido").reduce((s,t)=>s+t.monto,0);
+    const cobros=txs.filter(t=>t.pacienteId===pid&&t.estado==="Activo"&&t.tipo!=="Plan vendido").reduce((s,t)=>s+t.monto,0);
+    return planes-cobros;
+  };
+
   const loadAll=useCallback(async()=>{
     setLoading(true);setErrMsg("");
     try{
@@ -409,6 +416,7 @@ function App(){
                 turnosDia.map(t=>{
                   const pac=byId(patients,t.pacienteId);
                   const pagado=txs.some(tx=>tx.estado==="Activo"&&tx.tipo!=="Plan vendido"&&(Number(tx.turnoId)===t.id||(tx.pacienteId===t.pacienteId&&dateOf(tx.fecha)===t.fecha)));
+                  const sld=saldoPaciente(t.pacienteId);
                   return h("div",{key:t.id,style:{display:"flex",alignItems:"center",gap:6,padding:"8px 10px",borderRadius:8,background:"#f8f8f8",border:"1px solid #ececec"}},
                     h("div",{style:{width:36,height:36,borderRadius:"50%",background:C.pL,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:500,fontSize:12,color:C.primary,flexShrink:0}},
                       pac?(pac.nombre[0]+pac.apellido[0]):"?"
@@ -417,6 +425,10 @@ function App(){
                       h("p",{style:{margin:0,fontSize:13,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}},pac?(pac.nombre+" "+pac.apellido):"—"),
                       h("p",{style:{margin:0,fontSize:11,color:"#666"}},t.hora+" · "+(pac?.sesiones??0)+" ses.")
                     ),
+                    sld>0&&h("span",{
+                      title:"Saldo pendiente: "+fmt(sld),
+                      style:{fontSize:11,color:C.danger,background:C.dL,padding:"3px 7px",borderRadius:99,fontWeight:600,cursor:"help",whiteSpace:"nowrap",flexShrink:0}
+                    },"$ Debe"),
                     h(Badge,{color:pagado?C.primary:"#999",bg:pagado?C.pL:"#f0f0f0",text:pagado?"Pagado":"Sin cobro"}),
                     h("select",{
                       value:normEstado(t.estado),
@@ -480,13 +492,16 @@ function App(){
               ),
               filteredPats.length===0&&h("p",{style:{fontSize:13,color:"#666",textAlign:"center",padding:"1rem 0"}},"Sin pacientes"),
               h("div",{style:{display:"flex",flexDirection:"column",gap:6}},
-                filteredPats.map(p=>
-                  h("div",{key:p.id,onClick:()=>setSelPat(p.id),style:{padding:"10px 12px",borderRadius:10,border:"1px solid "+(selPat===p.id?C.primary:"#ececec"),background:selPat===p.id?C.pL:"#fff",cursor:"pointer"}},
-                    h("span",{style:{fontSize:13,fontWeight:500}},p.nombre+" "+p.apellido),
-                    h("br",{}),
+                filteredPats.map(p=>{
+                  const sld=saldoPaciente(p.id);
+                  return h("div",{key:p.id,onClick:()=>setSelPat(p.id),style:{padding:"10px 12px",borderRadius:10,border:"1px solid "+(selPat===p.id?C.primary:"#ececec"),background:selPat===p.id?C.pL:"#fff",cursor:"pointer"}},
+                    h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center"}},
+                      h("span",{style:{fontSize:13,fontWeight:500}},p.nombre+" "+p.apellido),
+                      sld>0&&h("span",{style:{fontSize:10,color:C.danger,background:C.dL,padding:"1px 6px",borderRadius:99,fontWeight:600},title:"Debe "+fmt(sld)},"Debe")
+                    ),
                     h("span",{style:{fontSize:11,color:"#666"}},"DNI "+p.dni+" · "+p.sesiones+" ses.")
-                  )
-                )
+                  );
+                })
               )
             ),
             selPat?(()=>{
@@ -506,6 +521,16 @@ function App(){
                       h("p",{style:{margin:0,fontSize:22,fontWeight:500,color:p.sesiones===0?C.danger:C.primary}},p.sesiones)
                     )
                   ),
+                  (()=>{
+                    const saldo=saldoPaciente(p.id);
+                    const bg=saldo>0?C.dL:saldo<0?C.iL:"#f0f0f0";
+                    const color=saldo>0?C.danger:saldo<0?C.info:"#666";
+                    const label=saldo>0?"Saldo pendiente (debe)":saldo<0?"Saldo a favor":"Sin saldo";
+                    return h("div",{style:{background:bg,borderRadius:8,padding:"10px 12px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}},
+                      h("span",{style:{fontSize:13,color,fontWeight:500}},label),
+                      h("span",{style:{fontSize:16,color,fontWeight:600}},fmt(Math.abs(saldo)))
+                    );
+                  })(),
                   h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"4px 12px",fontSize:12,borderTop:"1px solid #ececec",paddingTop:10}},
                     [["Tel",p.tel],["Email",p.email],["Dir",p.dir]].map(([k,v])=>h("div",{key:k},h("span",{style:{color:"#666"}},k+": "),v||"—"))
                   )
